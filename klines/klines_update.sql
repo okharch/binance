@@ -61,8 +61,15 @@ BEGIN
         url = format('https://api.binance.com/api/v3/klines?symbol=%s&interval=%s&startTime=%s&limit=%s',
                      asymbol, aperiod, last_open, limit_val);
         RAISE NOTICE 'Fetching klines for % with start_time = %: %', asymbol, to_timestamp(last_open/1000), url;
-        response = http_get(url);
-
+        -- protect from ERROR:  Resolving timed out after 1000 milliseconds
+        begin
+            response = http_get(url);
+            EXCEPTION
+                WHEN OTHERS THEN
+                    -- handle the error
+                    RAISE WARNING 'http_get error occurred: %', SQLERRM;
+                    return;
+        end;
         if response.status != 200 then
             raise warning 'binance fetch klines at %returned invalid status %, exiting', url, response.status;
         end if;
