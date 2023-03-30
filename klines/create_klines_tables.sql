@@ -35,27 +35,28 @@ CREATE TABLE IF NOT EXISTS binance.klines (
 
 drop table if exists binance.kline_periods;
 CREATE TABLE if not exists binance.kline_periods (
-                                       period VARCHAR(4) PRIMARY KEY
+                                       period VARCHAR(4) PRIMARY KEY,
+                                       duration INTERVAL not null
 );
 
-INSERT INTO binance.kline_periods (period)
+INSERT INTO binance.kline_periods (period, duration)
 VALUES
-    ('1m'),
-    ('3m'),
-    ('5m'),
-    ('15m'),
-    ('30m'),
-    ('1h'),
-    ('2h'),
-    ('4h'),
-    ('6h'),
-    ('8h'),
-    ('12h'),
-    ('1d'),
-    ('3d'),
-    ('1w'),
-    ('1M')
-on conflict do nothing ;
+    ('1m', '1 minute'),
+    ('3m', '3 minutes'),
+    ('5m', '5 minutes'),
+    ('15m', '15 minutes'),
+    ('30m', '30 minutes'),
+    ('1h', '1 hour'),
+    ('2h', '2 hours'),
+    ('4h', '4 hours'),
+    ('6h', '6 hours'),
+    ('8h', '8 hours'),
+    ('12h', '12 hours'),
+    ('1d', '1 day'),
+    ('3d', '3 days'),
+    ('1w', '1 week'),
+    ('1M', '1 month')
+ON CONFLICT DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS binance.symbol_klines (
                                                      symbol VARCHAR(20) NOT NULL,
