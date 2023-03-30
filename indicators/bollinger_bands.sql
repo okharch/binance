@@ -6,7 +6,7 @@ CREATE OR REPLACE FUNCTION trading_indicator.bollinger_bands(
     limit_number int
 )
     RETURNS TABLE (
-                      open_time timestamptz,
+                      open_time bigint,
                       close_price numeric,
                       upper_band numeric,
                       middle_band numeric,
@@ -43,7 +43,7 @@ begin
     SELECT STDDEV_POP(t.close_price) into standard_deviation
     from temp_klines t;
     for open_time, middle_band, close_price in
-        select tstz(t.open_time),AVG(t.close_price) OVER (ORDER BY t.open_time), t.close_price
+        select t.open_time,AVG(t.close_price) OVER (ORDER BY t.open_time), t.close_price
         from temp_klines t order by t.open_time
         loop
             upper_band = middle_band + standard_deviation * 2;
