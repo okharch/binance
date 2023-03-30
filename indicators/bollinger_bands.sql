@@ -33,6 +33,7 @@ declare
     standard_deviation numeric;
     prev_price numeric;
 begin
+    -- store last limit_number records from klines into temp_klines
     drop table if exists temp_klines;
     create temporary table temp_klines as
     SELECT t.open_time, t.close_price
@@ -40,8 +41,10 @@ begin
     WHERE symbol = asymbol AND period = aperiod
     ORDER BY t.open_time DESC
     LIMIT limit_number;
+    -- calculate STDDEV
     SELECT STDDEV_POP(t.close_price) into standard_deviation
     from temp_klines t;
+    -- calculate upper_band, lowe_band, trade_signal
     for open_time, middle_band, close_price in
         select t.open_time,AVG(t.close_price) OVER (ORDER BY t.open_time), t.close_price
         from temp_klines t order by t.open_time
@@ -53,6 +56,6 @@ begin
             end if;
             prev_price = close_price;
             return next;
-    end loop;
+        end loop;
 end
 $$ LANGUAGE plpgsql;
