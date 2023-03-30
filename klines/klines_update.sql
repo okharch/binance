@@ -1,5 +1,6 @@
 
-CREATE OR REPLACE PROCEDURE binance.klines_update(asymbol varchar, aperiod varchar) AS $$
+drop PROCEDURE binance.klines_update;
+CREATE OR REPLACE PROCEDURE binance.klines_update(asymbol varchar, aperiod varchar, commit_step bool) AS $$
 /*
 The binance.klines_update stored procedure updates the binance.klines table with the
 most recent klines for a given symbol and period from the Binance API.
@@ -40,6 +41,8 @@ DECLARE
     response http_response;
     url text;
     current_ts bigint;
+    count_affected int := 0;
+    rows_affected int;
 BEGIN
     current_ts = EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000;
     LOOP
@@ -81,9 +84,13 @@ BEGIN
             taker_buy_base_asset_volume = EXCLUDED.taker_buy_base_asset_volume,
             taker_buy_quote_asset_volume = EXCLUDED.taker_buy_quote_asset_volume
         ;
-        commit;
+        get diagnostics rows_affected=ROW_COUNT;
+        count_affected = count_affected + rows_affected;
+        if commit_step then
+            commit;
+        end if;
     END LOOP;
 
-    RAISE NOTICE 'Finished updating klines for % with period %', asymbol, aperiod;
+    RAISE NOTICE 'Finished updating klines for % with period %: % rows affected', asymbol, aperiod, count_affected;
 END;
 $$ LANGUAGE plpgsql;
