@@ -49,7 +49,7 @@ begin
             upper_band = middle_band + standard_deviation * 2;
             lower_band = middle_band - standard_deviation * 2;
             if prev_price is not null then
-                trade_signal = trading_indicator.generate_trading_signal(prev_price, close_price, lower_band, upper_band);
+                trade_signal = trading_indicator.trading_signal(prev_price, close_price, lower_band, upper_band);
             end if;
             prev_price = close_price;
             return next;
