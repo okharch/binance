@@ -3,13 +3,16 @@ DROP function if exists trading_indicator.bollinger_bands;
 CREATE OR REPLACE FUNCTION trading_indicator.bollinger_bands(
     asymbol character varying(20),
     aperiod character varying(4),
-    limit_number int
+    start_date timestamptz, -- start analysis from this date
+    bandwidth numeric, -- default 2
+    n int -- limit population
 )
     RETURNS TABLE (
                       open_time bigint,
                       close_price numeric,
                       upper_band numeric,
                       middle_band numeric,
+                      standard_deviation numeric,
                       lower_band numeric,
                       trade_signal varchar(4)
                   ) AS $$
@@ -30,32 +33,35 @@ CREATE OR REPLACE FUNCTION trading_indicator.bollinger_bands(
   - lower_band: the lower Bollinger Band value
 */
 declare
-    standard_deviation numeric;
     prev_price numeric;
+    count int := 0;
+    -- prices store last n prices to calculate avg and stddev_pop on each step
+    -- until all array is filled with values it will not return rows,
+    -- i.e. it skips first n prices
+    prices numeric[] := ARRAY_FILL(0.0, ARRAY[n]);
 begin
-    -- store last limit_number records from klines into temp_klines
-    drop table if exists temp_klines;
-    create temporary table temp_klines as
-    SELECT t.open_time, t.close_price
-    FROM binance.klines t
-    WHERE symbol = asymbol AND period = aperiod
-    ORDER BY t.open_time DESC
-    LIMIT limit_number;
-    -- calculate STDDEV
-    SELECT STDDEV_POP(t.close_price) into standard_deviation
-    from temp_klines t;
-    -- calculate upper_band, lowe_band, trade_signal
-    for open_time, middle_band, close_price in
-        select t.open_time,AVG(t.close_price) OVER (ORDER BY t.open_time), t.close_price
-        from temp_klines t order by t.open_time
-        loop
-            upper_band = middle_band + standard_deviation * 2;
-            lower_band = middle_band - standard_deviation * 2;
-            if prev_price is not null then
-                trade_signal = trading_indicator.trading_signal(prev_price, close_price, lower_band, upper_band);
+    middle_band := 0;
+    for open_time, close_price in
+        select t.open_time, t.close_price
+        from binance.klines t
+        WHERE t.symbol = asymbol AND t.period = aperiod
+          and t.open_time >= EXTRACT(EPOCH FROM start_date) * 1000
+        order by t.open_time loop
+            count = count + 1;
+            if count <= n then
+                prices[count] = close_price;
+                if count < n then
+                    continue ;
+                end if;
+            else
+                prices = ARRAY_APPEND(prices[2:],close_price);
             end if;
-            prev_price = close_price;
+            SELECT AVG(value),STDDEV_POP(value) into middle_band,standard_deviation FROM UNNEST(prices) AS value;
+            upper_band = middle_band + standard_deviation * bandwidth;
+            lower_band = middle_band - standard_deviation * bandwidth;
+            trade_signal = trading_indicator.trading_signal(prev_price, close_price, lower_band, upper_band);
             return next;
+            prev_price = close_price;
         end loop;
 end
 $$ LANGUAGE plpgsql;
