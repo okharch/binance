@@ -1,23 +1,24 @@
-# Price Alert System in PostgreSQL
+# Database for watching binance symbols performance
 
-This is a simple implementation of price alert system using PostgreSQL. 
-The system allows users to create price alerts for specific symbols, 
-and receive notifications when the price of that symbol goes above or below a certain value.
+## symbol_prices
+This is the list of all binance symbols and their latest prices.
+This data could be updated by update_prices procedure.
 
-The system is implemented using three tables: 
-`symbol_prices`, `alerts`, and `alerts_archive`. 
-`symbol_prices` stores the current prices for each symbol, 
-`alerts` stores the active alerts for each user, and 
-`alerts_archive` stores a record of triggered alerts.
+## klines
 
-The system is implemented using PostgreSQL stored procedures. 
-The `update_prices` procedure is called whenever new prices are available, 
-returns triggered alerts if the prices cross a threshold. 
-The `trigger_alerts` procedure is responsible for checking 
-which alerts have been triggered and moving them to the archive table.
+candle data for symbol and period. 
+this data is used by indicators calculation, 
+price information, etc. 
 
-The system also includes unit tests implemented as PostgreSQL functions. 
-These tests verify that the database is functioning correctly, and that alerts are triggered when expected.
+## symbol_klines
+lists which symbols and periods data for klines should be fetched
+
+## trading indicators
+  ### bolliger_band(symbol, period, limit_number)
+
+## signals
+  ### sol_bollinger - sends buy/sell signal for solana
+
 
 ## Requirements
 
