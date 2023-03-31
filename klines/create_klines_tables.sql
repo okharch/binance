@@ -58,6 +58,7 @@ VALUES
     ('1M', '1 month')
 ON CONFLICT DO NOTHING;
 
+-- this is a list of symbols and periods to update by update_symbols_klines SP
 CREATE TABLE IF NOT EXISTS binance.symbol_klines (
                                                      symbol VARCHAR(20) NOT NULL,
                                                      period VARCHAR(4) NOT NULL,

@@ -1,6 +1,5 @@
 
-drop PROCEDURE binance.klines_update;
-CREATE OR REPLACE PROCEDURE binance.klines_update(asymbol varchar, aperiod varchar, commit_step bool) AS $$
+CREATE OR REPLACE function binance.klines_update(asymbol varchar, aperiod varchar, commit_step bool) returns int AS $$
 /*
 The binance.klines_update stored procedure updates the binance.klines table with the
 most recent klines for a given symbol and period from the Binance API.
@@ -43,9 +42,11 @@ DECLARE
     current_ts bigint;
     count_affected int := 0;
     rows_affected int;
+    last_clock bigint;
 BEGIN
     current_ts = EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000;
-    LOOP
+    last_clock = EXTRACT(EPOCH FROM clock_timestamp()) * 1000 + 50000;
+    while last_clock > EXTRACT(EPOCH FROM clock_timestamp()) * 1000 LOOP
         -- find the most recent time we have,
         -- update the latest entry
         SELECT open_time,close_time INTO last_open, last_close
@@ -68,7 +69,7 @@ BEGIN
                 WHEN OTHERS THEN
                     -- handle the error
                     RAISE WARNING 'http_get error occurred: %', SQLERRM;
-                    return;
+                    return count_affected;
         end;
         if response.status != 200 then
             raise warning 'binance fetch klines at %returned invalid status %, exiting', url, response.status;
@@ -99,5 +100,6 @@ BEGIN
     END LOOP;
 
     RAISE NOTICE 'Finished updating klines for % with period %: % rows affected', asymbol, aperiod, count_affected;
+    return count_affected;
 END;
 $$ LANGUAGE plpgsql;
