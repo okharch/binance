@@ -5,7 +5,7 @@ CREATE OR REPLACE PROCEDURE binance.update_symbols_klines() LANGUAGE plpgsql AS 
 DECLARE
     -- perl -MDigest::CRC -e'print Digest::CRC::crc64("binance.update_symbols_klines")'
     -- 171798058097168294
-    lock_id INT := 171798058097168294;
+    lock_id bigint := 171798058097168294;
     lock_acquired BOOLEAN;
 BEGIN
     -- Attempt to acquire the advisory lock to prevent concurrent running of update_symbols_klines
@@ -31,4 +31,10 @@ BEGIN
             RAISE;
     END;
 END;
+$$;
+
+-- try to unlock update_symbols_klines lock, returns true or false and, usually,
+-- WARNING:  you don't own a lock of type ExclusiveLock
+create or replace function binance.unlock_update_symbols_klines() returns bool language sql as $$
+select pg_advisory_unlock(171798058097168294);
 $$;
