@@ -29,3 +29,5 @@ WHERE
   AND b.open_time = w.open_time
   and w.volume>w.prev_volume*4;
 $$;
+
+create or replace view sol_bollinger as select * from sol_bollinger(now()-interval '1 week',2.0,2000);
