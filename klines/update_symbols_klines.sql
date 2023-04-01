@@ -21,7 +21,9 @@ BEGIN
 
     BEGIN
         -- Iterate through the rows in the binance.symbol_klines table
-        perform binance.klines_update(t.symbol, t.period, false) FROM binance.symbol_klines t;
+        perform binance.klines_update(t.symbol, t.period, now()-p.duration*3000, 40)
+        FROM binance.symbol_klines t, binance.kline_periods p
+        where t.period=p.period;
         -- Release the advisory lock explicitly
         perform pg_advisory_unlock(lock_id);
     EXCEPTION

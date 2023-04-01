@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION sol_bollinger(start_date timestamptz,bandwidth numeric,n integer)
+CREATE OR REPLACE FUNCTION sol_bollinger(aperiod varchar(4), start_date timestamptz,bandwidth numeric,n integer)
     RETURNS TABLE (
                       open_time timestamp with time zone,
                       trade_signal varchar,
@@ -20,14 +20,16 @@ SELECT
     w.prev_close_price,
     w.next_close_price
 FROM
-    trading_indicator.bollinger_bands('SOLUSDT', '1m', start_date- n * interval '1 minute', bandwidth,n) b,
+    trading_indicator.bollinger_bands('SOLUSDT', aperiod,start_date, bandwidth,n) b,
     binance.klines_window w
 WHERE
-    b.trade_signal IS NOT NULL
-  AND w.symbol = 'SOLUSDT'
-  AND w.period = '1m'
+  w.symbol = 'SOLUSDT'
+  and b.trade_signal IS NOT NULL
+  AND w.period = aperiod
   AND b.open_time = w.open_time
   and w.volume>w.prev_volume*4;
 $$;
 
-create or replace view sol_bollinger as select * from sol_bollinger(now()-interval '1 week',2.0,2000);
+create or replace view sol_boll1m as select * from sol_bollinger('1m', now()-interval '1 day',2.0,2000);
+
+create or replace view sol_boll1s as select * from sol_bollinger('1s', now()-interval '3 hour',2.0,2000);
