@@ -39,7 +39,10 @@ declare
     -- until all array is filled with values it will not return rows,
     -- i.e. it skips first n prices
     prices numeric[] := ARRAY_FILL(0.0, ARRAY[n]);
+    pduration interval;
 begin
+    select duration into pduration from binance.kline_periods where period=aperiod;
+    start_date = start_date - pduration*n;
     middle_band := 0;
     for open_time, close_price in
         select t.open_time, t.close_price
