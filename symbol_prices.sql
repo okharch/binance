@@ -2,7 +2,7 @@
 create schema if not exists binance;
 --drop table if exists binance_tickers.symbol_prices;
 
-create table if not exists binance_tickers.symbol_prices(
+create table if not exists binance.symbol_prices(
     id serial primary key,
     symbol text not null unique,
     price float4 not null

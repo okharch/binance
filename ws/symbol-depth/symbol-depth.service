@@ -1,0 +1,14 @@
+[Unit]
+Description=Symbol Depth Service
+After=network.target
+
+[Service]
+User=root
+Group=root
+WorkingDirectory=/opt/binance/
+EnvironmentFile=/etc/environment
+ExecStart=/usr/bin/python3 /opt/binance/symbol-depth.py btcusdt solusdt btctusd
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
