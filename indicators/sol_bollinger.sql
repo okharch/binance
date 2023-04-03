@@ -24,10 +24,10 @@ FROM
     binance.klines_window w
 WHERE
   w.symbol = 'SOLUSDT'
-  and b.trade_signal IS NOT NULL
+  --and b.trade_signal IS NOT NULL
   AND w.period = aperiod
   AND b.open_time = w.open_time
-  and w.volume>w.prev_volume*4;
+  and w.volume>w.prev_volume*3;
 $$;
 
 create or replace view sol_boll1m as select * from sol_bollinger('1m', now()-interval '1 day',2.0,2000);

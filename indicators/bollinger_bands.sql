@@ -43,6 +43,7 @@ declare
 begin
     select duration into pduration from binance.kline_periods where period=aperiod;
     start_date = start_date - pduration*n;
+    raise notice 'scanning prices since %',start_date;
     middle_band := 0;
     for open_time, close_price in
         select t.open_time, t.close_price
