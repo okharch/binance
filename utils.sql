@@ -74,3 +74,36 @@ CREATE OR REPLACE FUNCTION weekago() RETURNS timestamptz AS $$
 SELECT NOW() - INTERVAL '1 week';
 $$ LANGUAGE SQL IMMUTABLE;
 
+/*
+Schedules a new job with the specified cron schedule and SQL statement, and sets the nodename field to an empty string.
+
+Arguments:
+- cron_schedule: The cron schedule expression for the job, specified as a text.
+- sql_statement: The SQL statement to be executed by the job, specified as a text.
+
+Returns: The ID of the newly scheduled job, as an integer.
+*/
+
+CREATE OR REPLACE FUNCTION schedule_job(p_schedule TEXT, p_job TEXT)
+    RETURNS integer AS $$
+DECLARE
+    v_job_id INTEGER;
+BEGIN
+    -- Remove the existing job with the same command
+    DELETE FROM cron.job
+    WHERE command = p_job;
+
+    -- Schedule the new job
+    SELECT cron.schedule(p_schedule, p_job)
+    INTO v_job_id;
+
+    -- Set the nodename to an empty string
+    UPDATE cron.job
+    SET nodename = ''
+    WHERE jobid = v_job_id;
+
+    return v_job_id;
+END
+$$ LANGUAGE plpgsql;
+
+
