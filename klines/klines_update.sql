@@ -81,7 +81,7 @@ BEGIN
 
         -- upsert the klines into the klines table
         count_affected = count_affected +
-            binance.upload_klines(asymbol,aperiod,response.content::jsonb);
+            binance.upload_klines(asymbol,aperiod,response.content);
     END LOOP;
 
     RAISE NOTICE 'Finished updating klines for % with period %: % rows affected', asymbol, aperiod, count_affected;
@@ -89,7 +89,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION binance.upload_klines(asymbol text, aperiod text, klines_jsonb jsonb) RETURNS integer AS $$
+CREATE OR REPLACE FUNCTION binance.upload_klines(asymbol text, aperiod text, klines_jsonb text) RETURNS integer AS $$
 DECLARE
     rows_affected integer;
 BEGIN
@@ -102,7 +102,7 @@ BEGIN
           (r->>1)::NUMERIC, (r->>2)::NUMERIC, (r->>3)::NUMERIC, (r->>4)::NUMERIC,
           (r->>5)::NUMERIC, (r->>6)::BIGINT, (r->>7)::NUMERIC, (r->>8)::BIGINT,
           (r->>9)::NUMERIC, (r->>10)::NUMERIC
-    FROM json_array_elements(klines_jsonb::json) AS r
+    FROM json_array_elements(klines_jsonb::jsonb) AS r
     ON CONFLICT (symbol, period, open_time) DO UPDATE
         SET
             open_price = EXCLUDED.open_price,
