@@ -81,10 +81,30 @@ BEGIN
         end if;
 
         -- upsert the klines into the klines table
-        INSERT INTO binance.klines (symbol, period, open_time, open_price, high_price, low_price, close_price, volume, close_time, quote_asset_volume, num_trades, taker_buy_base_asset_volume, taker_buy_quote_asset_volume)
-        SELECT asymbol, aperiod, (kline->>0)::BIGINT, (kline->>1)::NUMERIC, (kline->>2)::NUMERIC, (kline->>3)::NUMERIC, (kline->>4)::NUMERIC, (kline->>5)::NUMERIC, (kline->>6)::BIGINT, (kline->>7)::NUMERIC, (kline->>8)::BIGINT, (kline->>9)::NUMERIC, (kline->>10)::NUMERIC
-        FROM json_array_elements(response.content::json) AS kline
-        ON CONFLICT (symbol, period, open_time) DO UPDATE
+        count_affected = count_affected +
+            binance.upload_klines(asymbol,aperiod,response.content::jsonb)
+    END LOOP;
+
+    RAISE NOTICE 'Finished updating klines for % with period %: % rows affected', asymbol, aperiod, count_affected;
+    return count_affected;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION binance.upload_klines(asymbol text, aperiod text, klines_jsonb jsonb) RETURNS integer AS $$
+DECLARE
+    rows_affected integer;
+BEGIN
+    INSERT INTO binance.klines
+        (symbol, period, open_time,
+         open_price, high_price, low_price, close_price,
+         volume, close_time, quote_asset_volume, num_trades,
+         taker_buy_base_asset_volume, taker_buy_quote_asset_volume)
+    SELECT asymbol, aperiod, (r->>0)::BIGINT,
+          (r->>1)::NUMERIC, (r->>2)::NUMERIC, (r->>3)::NUMERIC, (r->>4)::NUMERIC,
+          (r->>5)::NUMERIC, (r->>6)::BIGINT, (r->>7)::NUMERIC, (r->>8)::BIGINT,
+          (r->>9)::NUMERIC, (r->>10)::NUMERIC
+    FROM json_array_elements(klines_jsonb::json) AS r
+    ON CONFLICT (symbol, period, open_time) DO UPDATE
         SET
             open_price = EXCLUDED.open_price,
             high_price = EXCLUDED.high_price,
@@ -96,15 +116,14 @@ BEGIN
             num_trades = EXCLUDED.num_trades,
             taker_buy_base_asset_volume = EXCLUDED.taker_buy_base_asset_volume,
             taker_buy_quote_asset_volume = EXCLUDED.taker_buy_quote_asset_volume
-        ;
-        get diagnostics rows_affected=ROW_COUNT;
-        count_affected = count_affected + rows_affected;
-    END LOOP;
+    ;
 
-    RAISE NOTICE 'Finished updating klines for % with period %: % rows affected', asymbol, aperiod, count_affected;
-    return count_affected;
+    GET DIAGNOSTICS rows_affected = ROW_COUNT;
+
+    RETURN rows_affected;
 END;
 $$ LANGUAGE plpgsql;
+
 
 /*
 Function Name: binance.klines_update(asymbol, aperiod)
