@@ -96,10 +96,8 @@ select drop_all_sp('binance', 'upload_klines');
 CREATE OR REPLACE FUNCTION binance.upload_klines(
     asymbol text, aperiod text, klines_jsonb text
 ) RETURNS TABLE (last_close_time bigint, rows_affected integer) AS $$
-DECLARE
-    rows_affected_var integer;
-    last_close_time_var bigint;
 BEGIN
+    -- obtain an exclusive lock on the key
     INSERT INTO binance.klines
     (symbol, period, open_time,
      open_price, high_price, low_price, close_price,
@@ -124,12 +122,9 @@ BEGIN
             taker_buy_quote_asset_volume = EXCLUDED.taker_buy_quote_asset_volume
     ;
 
-    GET DIAGNOSTICS rows_affected_var = ROW_COUNT;
-
-    SELECT MAX(close_time) INTO last_close_time_var FROM binance.klines WHERE symbol = asymbol AND period = aperiod;
-    last_close_time := last_close_time_var;
-    rows_affected := rows_affected_var;
-
+    GET DIAGNOSTICS rows_affected = ROW_COUNT;
+    -- return max(close_time) from array
+    SELECT MAX((r->>6)::BIGINT) INTO last_close_time FROM json_array_elements(klines_jsonb::json) r;
     RETURN next;
 END;
 $$ LANGUAGE plpgsql;
