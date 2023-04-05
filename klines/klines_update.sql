@@ -43,6 +43,7 @@ DECLARE
     url text;
     current_ts bigint;
     count_affected int := 0;
+    rows_affected int;
     last_clock bigint;
 BEGIN
     current_ts = EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000;
@@ -80,8 +81,10 @@ BEGIN
         end if;
 
         -- upsert the klines into the klines table
-        count_affected = count_affected +
-            binance.upload_klines(asymbol,aperiod,response.content);
+        select t.latest_open_time, t.rows_affected
+        into last_open, rows_affected
+        from binance.upload_klines(asymbol,aperiod,response.content) t;
+        count_affected = count_affected + rows_affected;
     END LOOP;
 
     RAISE NOTICE 'Finished updating klines for % with period %: % rows affected', asymbol, aperiod, count_affected;
@@ -89,19 +92,20 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION binance.upload_klines(asymbol text, aperiod text, klines_jsonb text) RETURNS integer AS $$
-DECLARE
-    rows_affected integer;
+select drop_all_sp('binance', 'upload_klines');
+CREATE OR REPLACE FUNCTION binance.upload_klines(
+    asymbol text, aperiod text, klines_jsonb text
+) RETURNS TABLE (latest_open_time bigint, rows_affected integer) AS $$
 BEGIN
     INSERT INTO binance.klines
-        (symbol, period, open_time,
-         open_price, high_price, low_price, close_price,
-         volume, close_time, quote_asset_volume, num_trades,
-         taker_buy_base_asset_volume, taker_buy_quote_asset_volume)
+    (symbol, period, open_time,
+     open_price, high_price, low_price, close_price,
+     volume, close_time, quote_asset_volume, num_trades,
+     taker_buy_base_asset_volume, taker_buy_quote_asset_volume)
     SELECT asymbol, aperiod, (r->>0)::BIGINT,
-          (r->>1)::NUMERIC, (r->>2)::NUMERIC, (r->>3)::NUMERIC, (r->>4)::NUMERIC,
-          (r->>5)::NUMERIC, (r->>6)::BIGINT, (r->>7)::NUMERIC, (r->>8)::BIGINT,
-          (r->>9)::NUMERIC, (r->>10)::NUMERIC
+           (r->>1)::NUMERIC, (r->>2)::NUMERIC, (r->>3)::NUMERIC, (r->>4)::NUMERIC,
+           (r->>5)::NUMERIC, (r->>6)::BIGINT, (r->>7)::NUMERIC, (r->>8)::BIGINT,
+           (r->>9)::NUMERIC, (r->>10)::NUMERIC
     FROM json_array_elements(klines_jsonb::jsonb) AS r
     ON CONFLICT (symbol, period, open_time) DO UPDATE
         SET
@@ -119,7 +123,9 @@ BEGIN
 
     GET DIAGNOSTICS rows_affected = ROW_COUNT;
 
-    RETURN rows_affected;
+    SELECT MAX(open_time) INTO latest_open_time FROM binance.klines WHERE symbol = asymbol AND period = aperiod;
+
+    RETURN;
 END;
 $$ LANGUAGE plpgsql;
 
