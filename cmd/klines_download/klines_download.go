@@ -8,7 +8,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 )
 
@@ -43,14 +42,10 @@ func main() {
 	}()
 
 	// Run DownloadWatchedSymbols with context, database connection, and wait group
-	var wg sync.WaitGroup
-	err = klines.DownloadWatchedSymbols(ctx, db, &wg)
+	err = klines.DownloadWatchedSymbols(ctx, db)
 	if err != nil {
 		log.Fatalf("Failed to download watched symbols: %v", err)
 	}
-
-	// Wait for all goroutines to finish
-	wg.Wait()
 
 	log.Println("klines_download: exit gracefully")
 }

@@ -2,7 +2,6 @@ package klines
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"github.com/okharch/binance/request"
 	"time"
@@ -10,32 +9,24 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func fetchAndUploadKlines(ctx context.Context, symbol string, period string, db *sqlx.DB) error {
+func fetchAndUploadKlines(ctx context.Context, symbol WatchSymbol, period string, db *sqlx.DB) error {
 	// Fetch the last close time from PostgreSQL database
-	var lastCloseTime sql.NullInt64
-	err := db.Get(&lastCloseTime, `
-	SELECT close_time FROM binance.klines 
-	WHERE symbol=$1 AND period=$2 
-	ORDER BY open_time limit 1`, symbol, period)
-	if err != nil && err != sql.ErrNoRows {
-		return err
-	}
 	// If lastCloseTime is null, set it to 2 years ago
-	if !lastCloseTime.Valid {
-		lastCloseTime.Int64 = time.Now().AddDate(-2, 0, 0).UnixNano() / int64(time.Millisecond)
+	if symbol.StartOpenTime == 0 {
+		symbol.StartOpenTime = time.Now().AddDate(-2, 0, 0).UnixNano() / int64(time.Millisecond)
 	}
 	// Calculate the next open time
-	nextOpenTime := lastCloseTime.Int64 + 1
+	nextOpenTime := symbol.StartOpenTime
 	// Continue downloading klines until rows affected is less than limit
 	for {
 		// Construct the URL to fetch klines from Binance API
 		limit := 1000 // maximum number of klines to download per request
-		url := fmt.Sprintf("https://binance.com/api/v3/klines?symbol=%s&interval=%s&startTime=%d&limit=%d", symbol, period, nextOpenTime, limit)
-		body, err := request.GetRequest(ctx, url, 20)
+		url := fmt.Sprintf("https://www.binance.com/api/v3/klines?symbol=%s&interval=%s&startTime=%d&limit=%d", symbol.Symbol, period, nextOpenTime, limit)
+		body, err := request.GetRequest(ctx, url, 30)
 		// Upload the klines to PostgreSQL database
 		var rowsAffected int
 		var lastCloseTime int64
-		rows := db.QueryRow("SELECT * FROM binance.upload_klines($1, $2, $3)", symbol, period, body)
+		rows := db.QueryRow("SELECT * FROM binance.upload_klines($1, $2, $3)", symbol.Symbol, period, body)
 		err = rows.Scan(&lastCloseTime, &rowsAffected)
 		if err != nil {
 			return err

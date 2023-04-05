@@ -8,9 +8,9 @@ import (
 	"strings"
 )
 
-func getBinanceWebSocketKlines(ctx context.Context, symbols []string) (<-chan string, error) {
+func getBinanceWebSocketKlines(ctx context.Context, symbols []WatchSymbol) (<-chan []byte, error) {
 	// Create a channel to receive messages
-	msgChan := make(chan string)
+	msgChan := make(chan []byte)
 
 	// Build the WebSocket URL for the specified symbols and intervals
 	url := fmt.Sprintf("wss://stream.binance.com:9443/stream?streams=%s",
@@ -35,7 +35,7 @@ func getBinanceWebSocketKlines(ctx context.Context, symbols []string) (<-chan st
 					log.Printf("error reading web socket stream %s: %s", url, err)
 					return
 				}
-				msgChan <- string(message)
+				msgChan <- message
 			}
 		}
 	}()
@@ -43,10 +43,10 @@ func getBinanceWebSocketKlines(ctx context.Context, symbols []string) (<-chan st
 	return msgChan, nil
 }
 
-func buildStreamList(symbols []string) []string {
+func buildStreamList(symbols []WatchSymbol) []string {
 	var streams []string
 	for _, symbol := range symbols {
-		stream := fmt.Sprintf("%s@kline_1m", strings.ToLower(symbol))
+		stream := fmt.Sprintf("%s@kline_1m", strings.ToLower(symbol.Symbol))
 		streams = append(streams, stream)
 	}
 	return streams
