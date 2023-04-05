@@ -2,6 +2,7 @@ package request
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -17,51 +18,89 @@ The adjustRateLimit function is used to adjust the current weight based on the h
 The subsystem uses a single sync.Mutex to protect access to the current weight and last update time, which are global variables. The waitRateLimit function blocks other goroutines until the weight limit is satisfied, and the adjustRateLimit function updates the current weight and last update time. By using this subsystem, the rate at which requests are made to the API can be managed and the usage limits can be respected.
 */
 
-const weightLimit = 1200
+const weightLimit = 350
 
-var currentWeight int
-var lastUpdate time.Time
-var rMu sync.Mutex
+var usedWeight1m int
+var waitUntil time.Time
+var waitMu sync.RWMutex
+var walMu sync.Mutex
 
-func waitRateLimit(ctx context.Context, supposedWeight int, url string) {
-	// Wait if the current weight plus the supposed weight exceeds the weight limit
-	rMu.Lock()
-	defer rMu.Unlock()
-
-	// reset currentWeight if no updates for more than a minute
-	for currentWeight+supposedWeight > weightLimit {
-		if time.Since(lastUpdate) > time.Minute {
-			currentWeight = 0
-			lastUpdate = time.Now()
-			continue
+// waits until waitUntil (set by handler or Retry-After) or next minute
+// if usedWeight1m>usedWeight1m
+// url parameter is used for logging only
+// returns true if context was not cancelled
+func waitApiLimit(ctx context.Context) bool {
+	waitMu.RLock()
+	var wld time.Duration
+	// check either minute usage or waitUntil
+	if usedWeight1m > weightLimit {
+		nextMinute := time.Now().Truncate(time.Minute).Add(time.Minute)
+		if nextMinute.After(waitUntil) {
+			waitUntil = nextMinute
 		}
-		waitTime := time.Second
-		rMu.Unlock()
-		log.Printf("waiting %v before requesting %s", waitTime, url)
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(waitTime):
-		}
-		rMu.Lock()
+	} else {
+		wld = time.Millisecond * 200 //calculateWaitLimitDuration(usedWeight1m, weightLimit)
 	}
-
-	// Add the supposed weight to the current weight and update the last update time
-	currentWeight += supposedWeight
+	waitUntilCopy := waitUntil
+	waitMu.RUnlock()
+	// lock waiting slot. everybody has to wait at least wld
+	walMu.Lock()
+	defer walMu.Unlock()
+	if time.Now().After(waitUntilCopy) && wld > 0 {
+		waitUntilCopy = time.Now().Add(wld)
+		log.Printf("wld %v until %v", wld, waitUntilCopy)
+	}
+	return waitUntilTimeOrCancelled(ctx, waitUntilCopy)
 }
 
-func adjustRateLimit(headers http.Header) int {
-	// Adjust the current weight based on the headers from the API response
-	usedWeight1m, err := strconv.Atoi(headers.Get("x-mbx-used-weight-1m"))
-	if err != nil {
-		usedWeight1m = 0
+// handles status codes 429, 418 and headers Retry-After, x-mbx-used-weight-1m, x-mbx-used-weight
+// in order to behave correctly regarding binance rest API
+// url parameter is used for logging only
+func handleApiLimit(res *http.Response, url string) (bool, error) {
+	// Check if the response status code is 429 (Too Many Requests)
+	waitMu.Lock()
+	defer waitMu.Unlock()
+	headers := res.Header
+	if res.StatusCode == 429 {
+		// If so, wait for the Retry-After header value and retry the request
+		retryAfterStr := headers.Get("Retry-After")
+		retryAfter, err := strconv.Atoi(retryAfterStr)
+		if err != nil {
+			return false, err
+		}
+		if retryAfter != 0 {
+			d := time.Duration(retryAfter) * time.Second
+			waitUntil = time.Now().Add(d)
+			log.Printf("retry when %s", waitUntil)
+			return true, nil
+		}
+	}
+	// Check if the response status code is 418 (IP banned for too many requests)
+	if res.StatusCode == 418 {
+		return false, fmt.Errorf("IP is banned for too many requests")
+	}
+	// Check if the response status code is not 200 (OK)
+	if res.StatusCode != 200 {
+		return false, fmt.Errorf("API returned status code %d", res.StatusCode)
 	}
 
-	rMu.Lock()
-	defer rMu.Unlock()
+	// Adjust the current weight based on the headers from the API response
+	usedWeight := headers.Get("x-mbx-used-weight")
+	var err error
+	usedWeight1m, err = strconv.Atoi(headers.Get("x-mbx-used-weight-1m"))
+	if err != nil {
+		usedWeight1m = 100
+	}
+	log.Printf("used weight:%s, weight 1m:%d, %s", usedWeight, usedWeight1m, url)
+	return false, nil
+}
 
-	// Update the current weight based on the headers
-	currentWeight = usedWeight1m
-	lastUpdate = time.Now()
-	return usedWeight1m
+func waitUntilTimeOrCancelled(ctx context.Context, t time.Time) bool {
+	log.Printf("wait until %v", t)
+	select {
+	case <-ctx.Done():
+		return false
+	case <-time.After(time.Until(t)):
+		return true
+	}
 }
