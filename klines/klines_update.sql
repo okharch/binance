@@ -43,7 +43,6 @@ DECLARE
     url text;
     current_ts bigint;
     count_affected int := 0;
-    rows_affected int;
     last_clock bigint;
 BEGIN
     current_ts = EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000;
@@ -82,7 +81,7 @@ BEGIN
 
         -- upsert the klines into the klines table
         count_affected = count_affected +
-            binance.upload_klines(asymbol,aperiod,response.content::jsonb)
+            binance.upload_klines(asymbol,aperiod,response.content::jsonb);
     END LOOP;
 
     RAISE NOTICE 'Finished updating klines for % with period %: % rows affected', asymbol, aperiod, count_affected;
