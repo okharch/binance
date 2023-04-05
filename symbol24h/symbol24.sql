@@ -69,4 +69,4 @@ $$ LANGUAGE plpgsql;
 -- schedule it every 10 minutes
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 call binance.update_ticker_data();
-SELECT schedule_job('*/10 * * * *', $$call binance.update_ticker_data()$$);
+SELECT schedule_job('5 * * * *', $$call binance.update_ticker_data()$$);

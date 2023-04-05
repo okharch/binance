@@ -95,7 +95,10 @@ $$ LANGUAGE plpgsql;
 select drop_all_sp('binance', 'upload_klines');
 CREATE OR REPLACE FUNCTION binance.upload_klines(
     asymbol text, aperiod text, klines_jsonb text
-) RETURNS TABLE (latest_open_time bigint, rows_affected integer) AS $$
+) RETURNS TABLE (last_close_time bigint, rows_affected integer) AS $$
+DECLARE
+    rows_affected_var integer;
+    last_close_time_var bigint;
 BEGIN
     INSERT INTO binance.klines
     (symbol, period, open_time,
@@ -106,7 +109,7 @@ BEGIN
            (r->>1)::NUMERIC, (r->>2)::NUMERIC, (r->>3)::NUMERIC, (r->>4)::NUMERIC,
            (r->>5)::NUMERIC, (r->>6)::BIGINT, (r->>7)::NUMERIC, (r->>8)::BIGINT,
            (r->>9)::NUMERIC, (r->>10)::NUMERIC
-    FROM json_array_elements(klines_jsonb::jsonb) AS r
+    FROM json_array_elements(klines_jsonb::json) AS r
     ON CONFLICT (symbol, period, open_time) DO UPDATE
         SET
             open_price = EXCLUDED.open_price,
@@ -121,11 +124,13 @@ BEGIN
             taker_buy_quote_asset_volume = EXCLUDED.taker_buy_quote_asset_volume
     ;
 
-    GET DIAGNOSTICS rows_affected = ROW_COUNT;
+    GET DIAGNOSTICS rows_affected_var = ROW_COUNT;
 
-    SELECT MAX(open_time) INTO latest_open_time FROM binance.klines WHERE symbol = asymbol AND period = aperiod;
+    SELECT MAX(close_time) INTO last_close_time_var FROM binance.klines WHERE symbol = asymbol AND period = aperiod;
+    last_close_time := last_close_time_var;
+    rows_affected := rows_affected_var;
 
-    RETURN;
+    RETURN next;
 END;
 $$ LANGUAGE plpgsql;
 
