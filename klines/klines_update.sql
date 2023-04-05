@@ -81,7 +81,7 @@ BEGIN
         end if;
 
         -- upsert the klines into the klines table
-        select t.latest_open_time, t.rows_affected
+        select t.last_close_time+1, t.rows_affected
         into last_open, rows_affected
         from binance.upload_klines(asymbol,aperiod,response.content) t;
         count_affected = count_affected + rows_affected;
