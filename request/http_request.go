@@ -34,20 +34,21 @@ func GetRequest(ctx context.Context, url string, expectedWeight int, db *sqlx.DB
 		}
 		defer res.Body.Close()
 		// Adjust the current weight based on the API response headers
-		lr, retry, err1 := handleApiLimit(res, url, comeTime, requestTime)
-		err = db_log.LogApiRequest(db, lr)
-		if err1 != nil {
-			return nil, err1
-		}
-		if err != nil {
-			log.Printf("Failed to insert API request log: %v", err)
-		}
-		if retry {
-			continue
-		}
+		lr, retry, errApiLimit := handleApiLimit(res, url, comeTime, requestTime)
 		// Read the response body as a byte slice
-		body, err := ioutil.ReadAll(res.Body)
-
-		return body, err
+		if !retry {
+			body, err := ioutil.ReadAll(res.Body)
+			lr.ResponseSize = len(body)
+			if errLog := db_log.LogApiRequest(db, lr); errLog != nil {
+				log.Printf("Failed to insert API request log: %v", errLog)
+			}
+			if errApiLimit != nil && err == nil {
+				err = errApiLimit
+			}
+			return body, err
+		}
+		if errApiLimit != nil {
+			return nil, errApiLimit
+		}
 	}
 }

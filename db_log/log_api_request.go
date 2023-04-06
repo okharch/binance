@@ -13,7 +13,7 @@ type ApiRequestLogRecord struct {
 	RequestTime        time.Time `db:"request_time"`
 	ResponseTime       time.Time `db:"response_time"`
 	ResponseStatusCode int       `db:"response_status_code"`
-	ResponseSize       int64     `db:"response_size"`
+	ResponseSize       int       `db:"response_size"`
 	RetryAfter         int       `db:"retry_after"`
 	UsedWeight         int       `db:"used_weight"`
 }

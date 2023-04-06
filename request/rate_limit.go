@@ -68,7 +68,6 @@ func handleApiLimit(res *http.Response, url string, comeTime, requestTime time.T
 	lr.ComeTime = comeTime
 	lr.RequestTime = requestTime
 	lr.RequestUrl = url
-	lr.ResponseSize = res.ContentLength
 	if res.StatusCode == 429 {
 		// If so, wait for the Retry-After header value and retry the request
 		lr.RetryAfter, err = strconv.Atoi(headers.Get("Retry-After"))
