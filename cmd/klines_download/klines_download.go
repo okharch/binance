@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
-	"github.com/okharch/binance/klines"
+	"github.com/okharch/binance/klines/download"
 	"log"
 	"os"
 	"os/signal"
@@ -42,7 +42,7 @@ func main() {
 	}()
 
 	// Run DownloadWatchedSymbols with context, database connection, and wait group
-	err = klines.DownloadWatchedSymbols(ctx, db)
+	err = download.DownloadWatchedSymbols(ctx, db)
 	if err != nil {
 		log.Fatalf("Failed to download watched symbols: %v", err)
 	}

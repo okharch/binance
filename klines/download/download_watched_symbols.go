@@ -1,4 +1,4 @@
-package klines
+package download
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"log"
 	"sync"
+	"time"
 )
 
 type WatchSymbol struct {
@@ -75,6 +76,8 @@ func downloadSymbolsKlinesViaREST(ctx context.Context, db *sqlx.DB, symbols []Wa
 		case <-ctx.Done():
 			break
 		default:
+			// make pause 100ms before launching new symbols
+			time.Sleep(100 * time.Millisecond)
 			ch <- symbol
 		}
 	}

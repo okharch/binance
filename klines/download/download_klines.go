@@ -1,4 +1,4 @@
-package klines
+package download
 
 import (
 	"context"
@@ -22,7 +22,7 @@ func fetchAndUploadKlines(ctx context.Context, symbol WatchSymbol, period string
 		// Construct the URL to fetch klines from Binance API
 		limit := 1000 // maximum number of klines to download per request
 		url := fmt.Sprintf("https://www.binance.com/api/v3/klines?symbol=%s&interval=%s&startTime=%d&limit=%d", symbol.Symbol, period, nextOpenTime, limit)
-		body, err := request.GetRequest(ctx, url, 30)
+		body, err := request.GetRequest(ctx, url, 30, db)
 		// Upload the klines to PostgreSQL database
 		var rowsAffected int
 		var lastCloseTime int64

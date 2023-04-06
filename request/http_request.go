@@ -2,16 +2,20 @@ package request
 
 import (
 	"context"
+	"github.com/jmoiron/sqlx"
+	"github.com/okharch/binance/db_log"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"time"
 )
 
 const UserAgent = "okharch/binance"
 
-func GetRequest(ctx context.Context, url string, expectedWeight int) ([]byte, error) {
+func GetRequest(ctx context.Context, url string, expectedWeight int, db *sqlx.DB) ([]byte, error) {
 	// Create a new HTTP request with the constructed URL
 	for { // loop in a case of Retry-After
+		comeTime := time.Now()
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 		if err != nil {
 			return nil, err
@@ -23,15 +27,20 @@ func GetRequest(ctx context.Context, url string, expectedWeight int) ([]byte, er
 		if !waitApiLimit(ctx) {
 			return nil, nil // context cancelled
 		}
+		requestTime := time.Now()
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {
 			return nil, err
 		}
 		defer res.Body.Close()
 		// Adjust the current weight based on the API response headers
-		retry, err := handleApiLimit(res, url)
+		lr, retry, err1 := handleApiLimit(res, url, comeTime, requestTime)
+		err = db_log.LogApiRequest(db, lr)
+		if err1 != nil {
+			return nil, err1
+		}
 		if err != nil {
-			return nil, err
+			log.Printf("Failed to insert API request log: %v", err)
 		}
 		if retry {
 			continue

@@ -3,6 +3,7 @@ package request
 import (
 	"context"
 	"fmt"
+	"github.com/okharch/binance/db_log"
 	"log"
 	"net/http"
 	"strconv"
@@ -56,43 +57,48 @@ func waitApiLimit(ctx context.Context) bool {
 // handles status codes 429, 418 and headers Retry-After, x-mbx-used-weight-1m, x-mbx-used-weight
 // in order to behave correctly regarding binance rest API
 // url parameter is used for logging only
-func handleApiLimit(res *http.Response, url string) (bool, error) {
+func handleApiLimit(res *http.Response, url string, comeTime, requestTime time.Time) (
+	lr db_log.ApiRequestLogRecord, retry bool, err error) {
 	// Check if the response status code is 429 (Too Many Requests)
 	waitMu.Lock()
 	defer waitMu.Unlock()
 	headers := res.Header
+	lr.ResponseStatusCode = res.StatusCode
+	lr.ResponseTime = time.Now()
+	lr.ComeTime = comeTime
+	lr.RequestTime = requestTime
+	lr.RequestUrl = url
+	lr.ResponseSize = res.ContentLength
 	if res.StatusCode == 429 {
 		// If so, wait for the Retry-After header value and retry the request
-		retryAfterStr := headers.Get("Retry-After")
-		retryAfter, err := strconv.Atoi(retryAfterStr)
+		lr.RetryAfter, err = strconv.Atoi(headers.Get("Retry-After"))
 		if err != nil {
-			return false, err
+			return
 		}
-		if retryAfter != 0 {
-			d := time.Duration(retryAfter) * time.Second
+		retry = lr.RetryAfter != 0
+		if retry {
+			d := time.Duration(lr.RetryAfter) * time.Second
 			waitUntil = time.Now().Add(d)
-			log.Printf("retry when %s", waitUntil)
-			return true, nil
+			return
 		}
 	}
 	// Check if the response status code is 418 (IP banned for too many requests)
 	if res.StatusCode == 418 {
-		return false, fmt.Errorf("IP is banned for too many requests")
+		err = fmt.Errorf("IP is banned for too many requests")
+		return
 	}
 	// Check if the response status code is not 200 (OK)
 	if res.StatusCode != 200 {
-		return false, fmt.Errorf("API returned status code %d", res.StatusCode)
+		err = fmt.Errorf("API returned status code %d", res.StatusCode)
+		return
 	}
 
 	// Adjust the current weight based on the headers from the API response
-	usedWeight := headers.Get("x-mbx-used-weight")
-	var err error
-	usedWeight1m, err = strconv.Atoi(headers.Get("x-mbx-used-weight-1m"))
+	lr.UsedWeight, err = strconv.Atoi(headers.Get("x-mbx-used-weight-1m"))
 	if err != nil {
 		usedWeight1m = 100
 	}
-	log.Printf("used weight:%s, weight 1m:%d, %s", usedWeight, usedWeight1m, url)
-	return false, nil
+	return
 }
 
 func waitUntilTimeOrCancelled(ctx context.Context, t time.Time) bool {
