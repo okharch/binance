@@ -1,0 +1,7 @@
+The periods used for longer-term and shorter-term moving averages in a Moving Average Crossover strategy depend on the specific application and time horizon of the trader or investor. There is no one-size-fits-all answer to this question.
+
+In general, longer-term moving averages tend to use larger periods such as 50, 100, or 200, while shorter-term moving averages tend to use smaller periods such as 5, 10, or 20. However, the choice of periods can vary depending on the asset being traded, the market conditions, and the trading style of the trader.
+
+For example, in a daily chart of a stock, a 50-day moving average could be considered a longer-term moving average, while a 10-day moving average could be considered a shorter-term moving average. In a 15-minute chart of a cryptocurrency, a 100-period moving average could be considered a longer-term moving average, while a 20-period moving average could be considered a shorter-term moving average.
+
+It's important to note that different periods can produce different signals and results, and there is no single "best" choice for the periods. Traders and investors should experiment with different periods and backtest their strategies to find the best combination of moving averages that works for their goals and objectives.
