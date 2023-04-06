@@ -40,7 +40,7 @@ func waitApiLimit(ctx context.Context) bool {
 			waitUntil = nextMinute
 		}
 	} else {
-		wld = time.Millisecond * 200 //calculateWaitLimitDuration(usedWeight1m, weightLimit)
+		wld = time.Millisecond * 50 //calculateWaitLimitDuration(usedWeight1m, weightLimit)
 	}
 	waitUntilCopy := waitUntil
 	waitMu.RUnlock()
