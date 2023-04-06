@@ -12,7 +12,7 @@ import (
 
 const UserAgent = "okharch/binance"
 
-func GetRequest(ctx context.Context, url string, expectedWeight int, db *sqlx.DB) ([]byte, error) {
+func GetRequest(ctx context.Context, url string, db *sqlx.DB) ([]byte, error) {
 	// Create a new HTTP request with the constructed URL
 	for { // loop in a case of Retry-After
 		comeTime := time.Now()
