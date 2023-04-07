@@ -8,8 +8,31 @@ import (
 )
 
 type Ticker struct {
-	position  int
-	klineData *klines.KLineData
+	position int
+	data1m   []klines.KLineEntry                   // 1 minute data for ticker
+	pdata    map[time.Duration][]klines.KLineEntry // other periods klines
+}
+
+func (t *Ticker) allocatePeriod(period time.Duration) {
+	// calculate the maximum number of klines to store for this period
+	count1mPeriods := int(period / time.Minute)
+	klinesLen := (len(t.data1m) + count1mPeriods - 1) / count1mPeriods
+	// add the new slice to the pdata map
+	t.pdata[period] = make([]klines.KLineEntry, klinesLen)
+}
+
+func NewTicker(data1m []klines.KLineEntry, periods []time.Duration) *Ticker {
+	t := &Ticker{
+		data1m: data1m,
+		pdata:  make(map[time.Duration][]klines.KLineEntry),
+	}
+
+	// allocate kline slices for each period in the periods slice
+	for _, period := range periods {
+		t.allocatePeriod(period)
+	}
+
+	return t
 }
 
 // Get a channel of klines starting from the beginning
@@ -20,12 +43,12 @@ func (t *Ticker) GetTicksChannel(ctx context.Context) <-chan klines.KLineEntry {
 	go func() {
 		defer close(channel)
 
-		for _, kline := range t.klineData.Data {
+		for i, kline := range t.data1m {
 			select {
 			case <-ctx.Done():
 				return
 			case channel <- kline:
-				t.position++
+				t.updatePosition(i)
 			}
 		}
 	}()
@@ -33,42 +56,61 @@ func (t *Ticker) GetTicksChannel(ctx context.Context) <-chan klines.KLineEntry {
 	return channel
 }
 
-// Get candlestick data for a given period
-func (t *Ticker) GetKLines(aKlines []klines.KLineEntry, period time.Duration) []klines.KLineEntry {
-	// Calculate the number of periods to aggregate
-	ticksPerPeriod := int(period / t.klineData.Period)
-	requiredTicks := cap(aKlines)
-	underlyingTicks := ticksPerPeriod * requiredTicks
+// is used internally when iterating over 1m candles to update/append new candles for larger periods
+func (t *Ticker) updatePosition(new1mposition int) {
+	// update the current position to the new 1 minute position
+	t.position = new1mposition
 
-	// Calculate the starting position for the requested period
-	startPosition := max(t.position-underlyingTicks+1, 0)
-	providedTicks := (t.position - startPosition + 1) / ticksPerPeriod
-	aKlines = aKlines[0:providedTicks]
-	// Aggregate kline data for the given period
-	var rTick *klines.KLineEntry
-	for j, i := 0, startPosition; i <= t.position; i++ {
-		tick := &t.klineData.Data[i]
-		if i == j*ticksPerPeriod {
-			rTick = &aKlines[j]
-			j++
-			// First kline in the period
-			rTick.OpenTime = tick.OpenTime
-			rTick.CloseTime = tick.CloseTime
-			rTick.OpenPrice = tick.OpenPrice
-			rTick.HighPrice = tick.HighPrice
-			rTick.LowPrice = tick.LowPrice
-			rTick.ClosePrice = tick.ClosePrice
-			rTick.Volume = tick.Volume
+	// get the new 1 minute kline
+	kLine1m := t.data1m[new1mposition]
+
+	// iterate over each period in the pdata map
+	for period, kLines := range t.pdata {
+		// calculate the number of 1 minute candles in the current period
+		count1mPeriods := int(period / time.Minute)
+
+		// calculate the index of the current kLine for the current period
+		idx := new1mposition / count1mPeriods
+
+		// get the current kLine for the current period
+		kLine := &kLines[idx]
+
+		// check if we just started a new period
+		if t.position%count1mPeriods == 0 {
+			// initialize the open price and time and other aggregate values for the new period
+			kLine.OpenPrice = kLine1m.OpenPrice
+			kLine.OpenTime = kLine1m.OpenTime
+			kLine.HighPrice = kLine1m.HighPrice
+			kLine.LowPrice = kLine1m.LowPrice
+			kLine.Volume = kLine1m.Volume
+			kLine.QuoteAssetVolume = kLine1m.QuoteAssetVolume
+			kLine.NumTrades = kLine1m.NumTrades
+			kLine.TakerBuyBaseAssetVolume = kLine1m.TakerBuyBaseAssetVolume
+			kLine.TakerBuyQuoteAssetVolume = kLine1m.TakerBuyQuoteAssetVolume
 		} else {
-			// Update current kline data
-			rTick.HighPrice = math.Max(rTick.HighPrice, tick.HighPrice)
-			rTick.LowPrice = math.Min(rTick.LowPrice, tick.LowPrice)
-			rTick.ClosePrice = tick.ClosePrice
-			rTick.CloseTime = tick.CloseTime
-			rTick.Volume += tick.Volume
+			// aggregate the kLine data if we're not at the start of a new period
+			kLine.HighPrice = math.Max(kLine.HighPrice, kLine1m.HighPrice)
+			kLine.LowPrice = math.Min(kLine.LowPrice, kLine1m.LowPrice)
+			kLine.Volume += kLine1m.Volume
+			kLine.QuoteAssetVolume += kLine1m.QuoteAssetVolume
+			kLine.NumTrades += kLine1m.NumTrades
+			kLine.TakerBuyBaseAssetVolume += kLine1m.TakerBuyBaseAssetVolume
+			kLine.TakerBuyQuoteAssetVolume += kLine1m.TakerBuyQuoteAssetVolume
 		}
+
+		// update the close price and time for the kLine
+		kLine.ClosePrice = kLine1m.ClosePrice
+		kLine.CloseTime = kLine1m.CloseTime
 	}
-	return aKlines
+}
+
+// Get specified number of candlesticks before and including current position
+func (t *Ticker) GetKLines(period time.Duration, n int) []klines.KLineEntry {
+	count1mPeriods := int(period / time.Minute)
+
+	// calculate the index of the current kLine for the current period
+	idx := t.position / count1mPeriods
+	return t.pdata[period][idx-n+1 : idx+1]
 }
 
 // Utility function to return the maximum of two integers

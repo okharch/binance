@@ -9,8 +9,8 @@ import (
 type KLineEntry struct {
 	OpenTime                 int64   `db:"open_time" json:"open_time"`
 	OpenPrice                float64 `db:"open_price" json:"open_price"`
-	HighPrice                float64 `db:"high_price" json:"high_price"`
 	LowPrice                 float64 `db:"low_price" json:"low_price"`
+	HighPrice                float64 `db:"high_price" json:"high_price"`
 	ClosePrice               float64 `db:"close_price" json:"close_price"`
 	Volume                   float64 `db:"volume" json:"volume"`
 	CloseTime                int64   `db:"close_time" json:"close_time"`
