@@ -33,7 +33,8 @@ func NewKLineData(symbol string, period time.Duration) *KLineData {
 	}
 }
 
-func (kd *KLineData) FetchKLineDataFromDB(db *sqlx.DB, startTime int64, endTime int64) error {
+func FetchKLineDataFromDB(db *sqlx.DB, symbol string, period time.Duration, startTime int64, endTime int64) (*KLineData, error) {
+	kd := NewKLineData(symbol, period)
 	var data []KLineEntry
 	query := `SELECT open_time, open_price, high_price, low_price, close_price, volume, close_time, quote_asset_volume, num_trades, taker_buy_base_asset_volume, taker_buy_quote_asset_volume 
 	FROM binance.klines 
@@ -41,14 +42,14 @@ func (kd *KLineData) FetchKLineDataFromDB(db *sqlx.DB, startTime int64, endTime 
 	ORDER BY open_time ASC`
 	err := db.Select(&data, query, kd.Symbol, Duration2Period(kd.Period), startTime, endTime)
 	if err != nil {
-		return fmt.Errorf("failed to fetch kline data from database: %w", err)
+		return nil, fmt.Errorf("failed to fetch kline data from database: %w", err)
 	}
 	kd.Data = data
-	return nil
+	return kd, nil
 }
 
-func (kd *KLineData) FetchKLineDataFromDBSincePeriodsBefore(db *sqlx.DB, periodsBefore int) error {
+func FetchKLineDataFromDBSincePeriodsBefore(db *sqlx.DB, symbol string, period time.Duration, periodsBefore int) (*KLineData, error) {
 	endTime := time.Now().UnixNano() / int64(time.Millisecond)
-	startTime := endTime - int64(periodsBefore)*int64(kd.Period/time.Millisecond)
-	return kd.FetchKLineDataFromDB(db, startTime, endTime)
+	startTime := endTime - int64(periodsBefore)*int64(period/time.Millisecond)
+	return FetchKLineDataFromDB(db, symbol, period, startTime, endTime)
 }
