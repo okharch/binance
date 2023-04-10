@@ -26,6 +26,8 @@ func InsertIndicatorSignals(db *sqlx.DB, signals []indicators.IndicatorSignal) e
 	return err
 }
 
+// GenerateSignals generates indicator signals for a given symbol using the provided
+// TGenIndicatorSignals, and inserts them into a database using a given context and SQLx database pointer.
 func (t *Ticker) GenerateSignals(ctx context.Context, db *sqlx.DB, symbolId int32, openTime int64, volume float64, indicatorSignals []TGenIndicatorSignal) error {
 	var signals []indicators.IndicatorSignal
 
@@ -59,9 +61,17 @@ func (t *Ticker) GenerateSignals(ctx context.Context, db *sqlx.DB, symbolId int3
 	}()
 
 	concurrentRoutines := make(chan struct{}, runtime.NumCPU())
-
 	var wg sync.WaitGroup
 	checkSignal := func(indSignal TGenIndicatorSignal, longTerm, shortTerm int, longTermKLines []klines.KLineEntry) {
+		if int(indSignal.IndicatorType) > 1024 {
+			log.Fatalf("invalid indicator type exceeds 1024: %s", indSignal.IndicatorType)
+		}
+		if longTerm >= 1<<11 {
+			log.Fatalf("invalid longTerm value: %d exceeds 2048", longTerm)
+		}
+		if shortTerm >= 1<<10 {
+			log.Fatalf("invalid shortTerm value: %d exceeds 1024", shortTerm)
+		}
 		wg.Add(1)
 		defer wg.Done()
 		select {
@@ -70,7 +80,7 @@ func (t *Ticker) GenerateSignals(ctx context.Context, db *sqlx.DB, symbolId int3
 		case concurrentRoutines <- struct{}{}: // take a slot
 			signal := indSignal.IndicatorFunc(longTermKLines, []int{longTerm, shortTerm})
 			if signal != TradeNone {
-				indicatorId := (int32(indicators.IndicatorTypeMAC)<<10+int32(longTerm))<<10 + int32(shortTerm)
+				indicatorId := int32((int(indSignal.IndicatorType)<<10+longTerm)<<12 + shortTerm)
 				if signal == TradeSell {
 					indicatorId = -indicatorId
 				}
