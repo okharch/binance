@@ -1,8 +1,6 @@
 package ticker
 
 import (
-	"github.com/jmoiron/sqlx"
-	"github.com/okharch/binance/indicators"
 	"github.com/okharch/binance/klines"
 	"log"
 )
@@ -46,29 +44,4 @@ func mac(longTermKLines []klines.KLineEntry, shortTerm int) TradeSignal {
 		return TradeSell
 	}
 	return TradeNone
-}
-
-func (t *Ticker) MAC(db *sqlx.DB, openTime int64, periodType, minLongTerm, maxLonTern int16, stMulMin, stMulMax, stDiv int) {
-	var signals []indicators.IndicatorSignal
-	// check min..max is < 1024
-	for longTerm := minLongTerm; longTerm <= maxLonTern; longTerm++ {
-		// check min..max < longTerm
-		for shortTerm := int(longTerm) * stMulMin / stDiv; shortTerm <= int(longTerm)*stMulMax/stDiv; shortTerm++ {
-			for i, count1mPeriods := range PeriodMinutes {
-				longTermKLines := t.GetKLines(i, count1mPeriods, int(longTerm)+2)
-				signal := mac(longTermKLines, shortTerm)
-				if signal != TradeNone {
-					indicatorId := (int32(indicators.IndicatorTypeMAC)<<10+int32(longTerm))<<10 + int32(shortTerm)
-					if signal == TradeSell {
-						indicatorId = -indicatorId
-					}
-					signals = append(signals, indicators.IndicatorSignal{
-						OpenTime:    closeTime,
-						IndicatorId: int64(indicatorId),
-						PeriodType:  int64(periodType),
-					})
-				}
-			}
-		}
-	}
 }

@@ -11,10 +11,11 @@ const (
 )
 
 type IndicatorSignal struct {
-	OpenTime    int32 `db:"open_time" json:"open_time"`
-	SymbolId    int32 `db:"symbol_id" json:"symbol_id"`
-	IndicatorId int32 `db:"indicator_id" json:"indicator_id"`
-	Periods     int16 `db:"periods" json:"periods"` // bits of periods that triggered signal
+	OpenTime    int64   `db:"open_time" json:"open_time"`
+	SymbolId    int32   `db:"symbol_id" json:"symbol_id"`
+	IndicatorId int32   `db:"indicator_id" json:"indicator_id"`
+	Period      int8    `db:"period" json:"period"`
+	Volume      float64 `db:"volume" json:"volume"`
 }
 
 func (it IndicatorType) String() string {
