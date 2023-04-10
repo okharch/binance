@@ -1,7 +1,5 @@
 package indicators
 
-const IndicatorBits = 8
-
 type IndicatorType int
 
 const (
