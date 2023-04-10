@@ -7,29 +7,25 @@ import (
 	"time"
 )
 
+var PeriodMinutes = []int{1, 5, 10, 15, 30, 60, 240, 720, 1440, 1440 * 3, 1440 * 7}
+
 type Ticker struct {
-	position int
-	data1m   []klines.KLineEntry                   // 1 minute data for ticker
-	pdata    map[time.Duration][]klines.KLineEntry // other periods klines
+	position  int
+	periods   [][]klines.KLineEntry
+	TradeNone TradeSignal
 }
 
-func (t *Ticker) allocatePeriod(period time.Duration) {
-	// calculate the maximum number of klines to store for this period
-	count1mPeriods := int(period / time.Minute)
-	klinesLen := (len(t.data1m) + count1mPeriods - 1) / count1mPeriods
-	// add the new slice to the pdata map
-	t.pdata[period] = make([]klines.KLineEntry, klinesLen)
+func (t *Ticker) allocatePeriods() {
 }
 
 func NewTicker(data1m []klines.KLineEntry, periods []time.Duration) *Ticker {
-	t := &Ticker{
-		data1m: data1m,
-		pdata:  make(map[time.Duration][]klines.KLineEntry),
-	}
-
-	// allocate kline slices for each period in the periods slice
-	for _, period := range periods {
-		t.allocatePeriod(period)
+	t := &Ticker{}
+	// calculate the maximum number of klines to store for this period
+	t.periods = make([][]klines.KLineEntry, len(PeriodMinutes))
+	t.periods[0] = data1m
+	minutes := len(data1m)
+	for i, m := range PeriodMinutes[1:] {
+		t.periods[i+1] = make([]klines.KLineEntry, (minutes+m-1)/m)
 	}
 
 	return t
@@ -43,7 +39,7 @@ func (t *Ticker) GetTicksChannel(ctx context.Context) <-chan klines.KLineEntry {
 	go func() {
 		defer close(channel)
 
-		for i, kline := range t.data1m {
+		for i, kline := range t.periods[0] {
 			select {
 			case <-ctx.Done():
 				return
@@ -62,17 +58,16 @@ func (t *Ticker) updatePosition(new1mposition int) {
 	t.position = new1mposition
 
 	// get the new 1 minute kline
-	kLine1m := t.data1m[new1mposition]
+	kLines1m := t.periods[0]
+	kLine1m := &kLines1m[new1mposition]
 
 	// iterate over each period in the pdata map
-	for period, kLines := range t.pdata {
-		// calculate the number of 1 minute candles in the current period
-		count1mPeriods := int(period / time.Minute)
-
+	for i, count1mPeriods := range PeriodMinutes[1:] {
 		// calculate the index of the current kLine for the current period
 		idx := new1mposition / count1mPeriods
 
 		// get the current kLine for the current period
+		kLines := t.periods[i+1]
 		kLine := &kLines[idx]
 
 		// check if we just started a new period
@@ -105,12 +100,10 @@ func (t *Ticker) updatePosition(new1mposition int) {
 }
 
 // Get specified number of candlesticks before and including current position
-func (t *Ticker) GetKLines(period time.Duration, n int) []klines.KLineEntry {
-	count1mPeriods := int(period / time.Minute)
-
+func (t *Ticker) GetKLines(periodIndex, count1mPeriods, n int) []klines.KLineEntry {
 	// calculate the index of the current kLine for the current period
 	idx := t.position / count1mPeriods
-	return t.pdata[period][idx-n+1 : idx+1]
+	return t.periods[periodIndex][idx-n+1 : idx+1]
 }
 
 // Utility function to return the maximum of two integers

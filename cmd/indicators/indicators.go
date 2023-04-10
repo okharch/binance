@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"github.com/jmoiron/sqlx"
+	indicators2 "github.com/okharch/binance/indicators"
 	"github.com/okharch/binance/klines"
 	"github.com/okharch/binance/ticker"
 	"log"
@@ -10,10 +11,19 @@ import (
 	"time"
 )
 
+
+func generateMacs() {
+	IndicatorCode := indicators2.IndicatorTypeMAC
+}
+
 func mac(ctx context.Context, period time.Duration, ticker *ticker.Ticker, params []int) {
+	const maxMacLength = 256
+	const minMacLength = 12
+	const longShortMul = 5
+	const longShortDiv = 7
+	kLines := ticker.GetKLines()
 	for kLine := range ticker.GetTicksChannel(ctx) {
-		tradeSignal := ticker.MAC(period, params[0],params[1])
-		if tradeSignal != ticker.None
+		ticker.MAC()
 	}
 }
 
