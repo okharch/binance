@@ -26,7 +26,7 @@ func InsertIndicatorSignals(db *sqlx.DB, signals []indicators.IndicatorSignal) e
 	return err
 }
 
-func (t *Ticker) GenerateSignals(ctx context.Context, db *sqlx.DB, symbolId int32, openTime int64, volume float64, indicatorSignals []TGenIndicatorSignal, max_procs int) error {
+func (t *Ticker) GenerateSignals(ctx context.Context, db *sqlx.DB, symbolId int32, openTime int64, volume float64, indicatorSignals []TGenIndicatorSignal) error {
 	var signals []indicators.IndicatorSignal
 
 	signalChannel := make(chan indicators.IndicatorSignal, 1024)
@@ -42,6 +42,7 @@ func (t *Ticker) GenerateSignals(ctx context.Context, db *sqlx.DB, symbolId int3
 		signals = signals[:0] // reset slice
 		return nil
 	}
+	// this server handles concurrent access to signals slice using signalChannel
 	var waitSignals sync.WaitGroup
 	go func() {
 		waitSignals.Add(1)
