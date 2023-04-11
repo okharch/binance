@@ -1,12 +1,12 @@
-package ticker
+package mac
 
 import (
+	"github.com/okharch/binance/indicators"
 	"github.com/okharch/binance/klines"
 	"log"
-	"time"
 )
 
-/* for array of length n+2 returns three last moving average value for n */
+/* for array of length n+1 returns two last moving average value for n */
 func average2(klines []klines.KLineEntry) (avg1, avg2 float64) {
 	sum := 0.0
 	n := len(klines) - 1
@@ -30,24 +30,25 @@ func average2(klines []klines.KLineEntry) (avg1, avg2 float64) {
 - Klines data can be used to calculate the moving averages.
 */
 
-func mac(longTermKLines []klines.KLineEntry, shortTerm int) TradeSignal {
+func mac(longTermKLines []klines.KLineEntry, shortTerm int) indicators.TradeSignal {
 	shortTermKlines := longTermKLines[len(longTermKLines)-shortTerm:]
 	s1, s2 := average2(shortTermKlines)
 	l1, l2 := average2(longTermKLines)
 	log.Printf("s1:%.1f,s2:%.1f,l1:%.1f,l2:%.1f", s1, s2, l1, l2)
 	if s1 < 0 || s2 < 0 {
-		return TradeNone
+		return indicators.TradeNone
 	}
 	if s1 < s2 && s1 < l1 && s2 > l2 {
-		return TradeBuy
+		return indicators.TradeBuy
 	}
 	if s1 > s2 && s1 > l1 && s2 < l2 {
-		return TradeSell
+		return indicators.TradeSell
 	}
-	return TradeNone
+	return indicators.TradeNone
 }
 
-func (t *Ticker) MAC(period time.Duration, shortTerm, longTerm int) TradeSignal {
-	longTermKLines := t.GetKLines(period, longTerm+2)
-	return mac(longTermKLines, shortTerm)
+func MAC(kLines []klines.KLineEntry, params []int) indicators.TradeSignal {
+	longTerm := params[0]
+	shortTerm := params[1]
+	return mac(kLines[:longTerm], shortTerm)
 }

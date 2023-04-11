@@ -1,6 +1,7 @@
-package ticker
+package mac
 
 import (
+	"github.com/okharch/binance/indicators"
 	"github.com/okharch/binance/klines"
 	"testing"
 )
@@ -8,11 +9,11 @@ import (
 func TestMAC(t *testing.T) {
 	tests := []struct {
 		shortTerm int
-		expected  TradeSignal
+		expected  indicators.TradeSignal
 		prices    []float64
 	}{
-		{5, TradeBuy, []float64{20, 21, 11, 18, 10, 10, 14, 13, 15, 18}},
-		{5, TradeSell, []float64{10, 11, 12, 13, 20, 16, 15, 14, 13, 9}},
+		{5, indicators.TradeBuy, []float64{20, 21, 11, 18, 10, 10, 14, 13, 15, 18}},
+		{5, indicators.TradeSell, []float64{10, 11, 12, 13, 20, 16, 15, 14, 13, 9}},
 	}
 
 	for _, test := range tests {

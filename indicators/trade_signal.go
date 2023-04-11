@@ -1,4 +1,4 @@
-package ticker
+package indicators
 
 type TradeSignal int
 
