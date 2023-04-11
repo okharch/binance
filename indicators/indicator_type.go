@@ -9,11 +9,13 @@ const (
 )
 
 type IndicatorSignal struct {
-	OpenTime    int64   `db:"open_time" json:"open_time"`
-	SymbolId    int32   `db:"symbol_id" json:"symbol_id"`
-	IndicatorId int32   `db:"indicator_id" json:"indicator_id"`
-	Period      int8    `db:"period" json:"period"`
-	Volume      float64 `db:"volume" json:"volume"`
+	OpenTime    int64   `db:"open_time"`
+	SymbolId    int32   `db:"symbol_id"`
+	IndicatorId int32   `db:"indicator_id"`
+	Period      int8    `db:"period"`
+	Volume      float64 `db:"volume"`
+	VolAvg      float64 `db:"vol_avg"`
+	Vol3Avg     float64 `db:"vol3_avg"`
 }
 
 func (it IndicatorType) String() string {

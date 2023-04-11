@@ -2,54 +2,52 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"github.com/jmoiron/sqlx"
-	indicators2 "github.com/okharch/binance/indicators"
-	"github.com/okharch/binance/klines"
-	"github.com/okharch/binance/ticker"
 	"log"
 	"os"
-	"time"
 )
 
-
-func generateMacs() {
-	IndicatorCode := indicators2.IndicatorTypeMAC
-}
-
-func mac(ctx context.Context, period time.Duration, ticker *ticker.Ticker, params []int) {
-	const maxMacLength = 256
-	const minMacLength = 12
-	const longShortMul = 5
-	const longShortDiv = 7
-	kLines := ticker.GetKLines()
-	for kLine := range ticker.GetTicksChannel(ctx) {
-		ticker.MAC()
+// Define a function to establish a database connection using the TBOTS_DB environment variable
+func getDB() (*sqlx.DB, error) {
+	db, err := sqlx.Connect("postgres", os.Getenv("TBOTS_DB"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
-}
-
-var indicators = map[string]func(context.Context,*ticker.Ticker, []int){
-	"mac": mac,
+	return db, nil
 }
 
 func main() {
-	var db *sqlx.DB
-
-	// connect to postgresql db using url from envTBOTS_DB
-
-	// get indicator name like "mac" from command line $1
-	symbol := os.Args[1]
-	iFunc := indicators[os.Args[2]]
-	var params []int
-	// get its numeric parameters into slice from $2..$n
-	// os.Args[2..] convert to int and create params slice []int
-	//params := os.Args[3:]
-	...
-	// download all data for SOLUSDT period 1 minute
-	kd, err := klines.FetchKLineDataFromDBSincePeriodsBefore(db, "SOLUSDT", 60*24*365)
+	// Establish a database connection
+	db, err := getDB()
 	if err != nil {
-		log.Fatalf("was not able to fetch 1m history for %s: %s ", symbol, err)
+		log.Fatalf("failed to connect to database: %v", err)
+	}
+	defer db.Close()
+
+	// Retrieve all symbols from binance.klines
+	symbols, err := klines.GetSymbols(db)
+	if err != nil {
+		log.Fatalf("failed to retrieve symbols: %v", err)
 	}
 
-	// call ifFunc with parameters
-	iFunc(kd,params)
+	// Generate signals for each symbol
+	for _, symbol := range symbols {
+		// Retrieve the k-line data for the symbol
+		data, err := klines.GetKLines(db, symbol.Symbol, "1m")
+		if err != nil {
+			log.Printf("failed to retrieve k-line data for %s: %v", symbol.Symbol, err)
+			continue
+		}
+
+		// Create a ticker for the k-line data
+		ticker := NewTicker(data)
+
+		// Generate signals for the symbol and insert them into the database
+		err = ticker.GenerateSignals(context.Background(), db, symbol.SymbolId)
+		if err != nil {
+			log.Printf("failed to generate signals for %s: %v", symbol.Symbol, err)
+			continue
+		}
+	}
 }

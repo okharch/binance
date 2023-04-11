@@ -4,21 +4,19 @@ import (
 	"context"
 	"github.com/okharch/binance/klines"
 	"math"
-	"time"
 )
 
 var PeriodMinutes = []int{1, 5, 10, 15, 30, 60, 240, 720, 1440, 1440 * 3, 1440 * 7}
 
 type Ticker struct {
-	position  int
-	periods   [][]klines.KLineEntry
-	TradeNone TradeSignal
+	position int
+	periods  [][]klines.KLineEntry
 }
 
 func (t *Ticker) allocatePeriods() {
 }
 
-func NewTicker(data1m []klines.KLineEntry, periods []time.Duration) *Ticker {
+func NewTicker(data1m []klines.KLineEntry) *Ticker {
 	t := &Ticker{}
 	// calculate the maximum number of klines to store for this period
 	t.periods = make([][]klines.KLineEntry, len(PeriodMinutes))
@@ -38,7 +36,7 @@ func (t *Ticker) GetTicksChannel(ctx context.Context) <-chan klines.KLineEntry {
 	// Start a goroutine to send klines to the channel
 	go func() {
 		defer close(channel)
-
+		// loop over minute bars
 		for i, kline := range t.periods[0] {
 			select {
 			case <-ctx.Done():
@@ -103,6 +101,9 @@ func (t *Ticker) updatePosition(new1mposition int) {
 func (t *Ticker) GetKLines(periodIndex, count1mPeriods, n int) []klines.KLineEntry {
 	// calculate the index of the current kLine for the current period
 	idx := t.position / count1mPeriods
+	if idx <= n {
+		return nil
+	}
 	return t.periods[periodIndex][idx-n+1 : idx+1]
 }
 
