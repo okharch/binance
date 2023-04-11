@@ -5,17 +5,19 @@ DECLARE
     d jsonb;
     k jsonb;
     rows_affected integer;
+    symbol_id int;
 BEGIN
     klines_json := klines_json_text::jsonb;
     d := klines_json->>'data';
     k := d->>'k';
+    symbol_id := binance.get_symbol_id(k->>'s');
 
     INSERT INTO binance.klines
-    (symbol, period, open_time,
+    (symbol_id, period, open_time,
      open_price, high_price, low_price, close_price,
      volume, close_time, quote_asset_volume, num_trades,
      taker_buy_base_asset_volume, taker_buy_quote_asset_volume)
-    SELECT k->>'s', k->>'i', (k->>'t')::bigint,
+    SELECT symbol_id, k->>'i', (k->>'t')::bigint,
            (k->>'o')::numeric, (k->>'h')::numeric, (k->>'l')::numeric, (k->>'c')::numeric,
            (k->>'v')::numeric, (k->>'T')::bigint, (k->>'q')::numeric, (k->>'n')::bigint,
            (k->>'V')::numeric, (k->>'Q')::numeric
