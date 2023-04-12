@@ -19,10 +19,11 @@ func fetchWatchedSymbols(db *sqlx.DB) (result []WatchSymbol, err error) {
 	// so they have a chance to be updated quickly and move on
 	// while others symbols are being updated
 	err = db.Select(&result, `
-	SELECT a.symbol, coalesce(bb.open_time, 0) as start_open_time
-	FROM binance.watch_symbols a left join lateral (
+	SELECT b.symbol, coalesce(bb.open_time, 0) as start_open_time
+	FROM binance.watch_symbols a inner join binance.exchange_symbols b on a.symbol_id=b.symbol_id
+	    left join lateral (
 	    select open_time from binance.klines b 
-	    where a.symbol=b.symbol and b.period='1m' 
+	    where a.symbol_id=b.symbol_id and b.period='1m' 
 	    order by 1 desc limit 1
 	) bb on true
 	order by 2 desc

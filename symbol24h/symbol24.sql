@@ -38,27 +38,14 @@ CREATE TABLE IF NOT EXISTS binance.ticker_data
     primary key (symbol_id,open_time)
 );
 
-CREATE OR REPLACE procedure binance.update_ticker_data() AS $$
-DECLARE
-    -- The Binance API endpoint https://api.binance.com/api/v3/ticker/24hr returns the
-    -- 24-hour trading data for each symbol. The data is a
-    -- rolling window of 24 hours,
-    -- starting from the current time and going back 24 hours.
-    -- This means that the data is continuously updated, and the
-    -- 24-hour window keeps moving as time progresses.
-    url text := 'https://api.binance.com/api/v3/ticker/24hr';
-    response http_response;
+CREATE OR REPLACE procedure binance.update_ticker_data(json_td text) AS $$
+declare
     rows_affected bigint;
 BEGIN
-    response := http_get(url);
-    if response.status != 200 then
-        raise warning 'binance fetch ticker/24hr at % returned invalid status %, exiting', url, response.status;
-        return;
-    end if;
     -- insert rolling data into ticker_data
     INSERT INTO binance.ticker_data (symbol_id, price_change, price_change_percent, weighted_avg_price, prev_close_price, last_price, last_qty, bid_price, ask_price, open_price, high_price, low_price, volume, quote_volume, open_time, close_time)
     SELECT ei.symbol_id, (t->>'priceChange')::numeric, (t->>'priceChangePercent')::numeric, (t->>'weightedAvgPrice')::numeric, (t->>'prevClosePrice')::numeric, (t->>'lastPrice')::numeric, (t->>'lastQty')::numeric, (t->>'bidPrice')::numeric, (t->>'askPrice')::numeric, (t->>'openPrice')::numeric, (t->>'highPrice')::numeric, (t->>'lowPrice')::numeric, (t->>'volume')::numeric, (t->>'quoteVolume')::numeric, (t->>'openTime')::bigint, (t->>'closeTime')::bigint
-    FROM json_array_elements(response.content::json) t, binance.exchange_symbols ei
+    FROM json_array_elements(json_td::json) t, binance.exchange_symbols ei
     where ei.symbol = t->>'symbol'
     on conflict do nothing;
     get diagnostics rows_affected=row_count ;
@@ -67,6 +54,6 @@ END
 $$ LANGUAGE plpgsql;
 
 -- schedule it every 10 minutes
-CREATE EXTENSION IF NOT EXISTS pg_cron;
-call binance.update_ticker_data();
-SELECT schedule_job('5 * * * *', $$call binance.update_ticker_data()$$);
+--CREATE EXTENSION IF NOT EXISTS pg_cron;
+--call binance.update_ticker_data();
+--SELECT schedule_job('5 * * * *', $$call binance.update_ticker_data()$$);

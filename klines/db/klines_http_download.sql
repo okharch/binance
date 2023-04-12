@@ -38,7 +38,7 @@ last_open BIGINT;
     last_close bigint;
     last_updated bool;
     limit_val INTEGER := 1000; -- max
-    response http_response;
+    --response http_response;
     url text;
     current_ts bigint;
     count_affected int := 0;

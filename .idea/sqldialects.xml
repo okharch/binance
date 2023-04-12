@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="SqlDialectMappings">
+    <file url="file://$PROJECT_DIR$/klines/db/klines_http_download.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/klines/db/klines_upload.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/klines/db/update_klines_from_ws.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/klines/download/download_watched_symbols.go" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/symbol24h/symbol24.sql" dialect="PostgreSQL" />
-    <file url="file://$PROJECT_DIR$/ticker/generate_signals.go" dialect="GenericSQL" />
+    <file url="file://$PROJECT_DIR$/ticker/indicators/generate_signals.go" dialect="GenericSQL" />
+    <file url="PROJECT" dialect="PostgreSQL" />
   </component>
 </project>

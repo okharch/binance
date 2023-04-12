@@ -6,7 +6,7 @@ import (
 	"math"
 )
 
-var PeriodMinutes = []int{1, 5, 10, 15, 30, 60, 240, 720, 1440, 1440 * 3, 1440 * 7}
+var PeriodMinutes = []int{1, 5} //, 10, 15, 30, 60, 240, 720, 1440, 1440 * 3, 1440 * 7}
 
 type Ticker struct {
 	position int

@@ -1,8 +1,8 @@
 package mac
 
 import (
-	"github.com/okharch/binance/indicators"
 	"github.com/okharch/binance/klines"
+	"github.com/okharch/binance/ticker/indicators"
 	"testing"
 )
 

@@ -1,9 +1,13 @@
-CREATE OR REPLACE VIEW binance.last_ticker_data_snapshot AS
+drop view if exists binance.last_ticker_data_snapshot;
+drop view if exists binance.last_ticker_data;
+CREATE OR REPLACE VIEW binance.last_ticker_data AS
 SELECT
-    t.*,
     es.symbol,
-    to_timestamp(t.open_time) open_time_tz,
-    binance.get_usdt_volume(t.symbol_id, t.volume, t.open_time) AS usdt_volume
+    es.quote_asset,
+    es.base_asset,
+    t.*,
+    to_timestamp(t.open_time) open_time_tz
+    --,binance.get_usdt_volume(t.symbol_id, t.volume, t.open_time) AS usdt_volume
 FROM
     binance.ticker_data t
         JOIN binance.exchange_symbols es ON t.symbol_id = es.symbol_id

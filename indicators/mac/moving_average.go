@@ -1,9 +1,8 @@
 package mac
 
 import (
-	"github.com/okharch/binance/indicators"
 	"github.com/okharch/binance/klines"
-	"log"
+	"github.com/okharch/binance/ticker/indicators"
 )
 
 /* for array of length n+1 returns two last moving average value for n */
@@ -34,7 +33,7 @@ func mac(longTermKLines []klines.KLineEntry, shortTerm int) indicators.TradeSign
 	shortTermKlines := longTermKLines[len(longTermKLines)-shortTerm:]
 	s1, s2 := average2(shortTermKlines)
 	l1, l2 := average2(longTermKLines)
-	log.Printf("s1:%.1f,s2:%.1f,l1:%.1f,l2:%.1f", s1, s2, l1, l2)
+	//log.Printf("s1:%.1f,s2:%.1f,l1:%.1f,l2:%.1f", s1, s2, l1, l2)
 	if s1 < 0 || s2 < 0 {
 		return indicators.TradeNone
 	}

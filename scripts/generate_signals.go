@@ -8,6 +8,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/okharch/binance/klines"
 	"github.com/okharch/binance/ticker"
+	"github.com/okharch/binance/ticker/indicators"
 	"log"
 	"os"
 	"os/signal"
@@ -30,6 +31,9 @@ func GetDB(envVarName string) (*sqlx.DB, error) {
 }
 
 func main() {
+	// Set a custom log formatter that includes line numbers
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
 	// Connect to the database.
 	db, err := GetDB("TBOTS_DB")
 	if err != nil {
@@ -58,17 +62,18 @@ func main() {
 	// For each symbol, fetch 1-minute klines and generate signals.
 	for _, symbol := range symbols {
 		// Fetch 1-minute klines for the symbol.
-		kLineData, err := klines.FetchKLineDataFromDBSincePeriodsBefore(db, symbol, int64(ticker.GetMaxMinutes()))
+		kLineData, err := klines.FetchKLineDataFromDBSincePeriodsBefore(db, symbol, int64(indicators.GetMaxMinutes()))
 		if err != nil {
 			log.Printf("failed to fetch klines for symbol %s: %v", symbol, err)
 			continue
 		}
+		log.Printf("generating signals for %d, periods: %d", symbol, len(kLineData.Data))
 
 		// Create a ticker using the 1-minute klines.
 		t := ticker.NewTicker(kLineData.Data)
 		ticks := t.GetTicksChannel(ctx)
 		for tick := range ticks {
-			log.Printf("generating signals for %d: %d", symbol, tick.OpenTime)
+			_ = tick
 			// Generate signals using the ticker.
 			if err := t.GenerateSignals(ctx, db, symbol); err != nil {
 				log.Printf("failed to generate signals for symbol %s: %v", symbol, err)
