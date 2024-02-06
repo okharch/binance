@@ -8,13 +8,15 @@ import (
 	"strings"
 )
 
-func getBinanceWebSocketKlines(ctx context.Context, symbols []WatchSymbol) (<-chan []byte, error) {
+// getBinanceWebSocketKlines subscribes to the Binance WebSocket API to receive klines for the specified symbols and intervals
+// it returns a channel that receives messages from the WebSocket connection
+func getBinanceWebSocketKlines(ctx context.Context, symbols []WatchSymbol, period KLinePeriod) (<-chan []byte, error) {
 	// Create a channel to receive messages
 	msgChan := make(chan []byte)
 
 	// Build the WebSocket URL for the specified symbols and intervals
 	url := fmt.Sprintf("wss://stream.binance.com:9443/stream?streams=%s",
-		strings.Join(buildStreamList(symbols), "/"))
+		strings.Join(buildStreamList(symbols, period), "/"))
 
 	// Connect to the Binance WebSocket API
 	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
@@ -43,11 +45,13 @@ func getBinanceWebSocketKlines(ctx context.Context, symbols []WatchSymbol) (<-ch
 	return msgChan, nil
 }
 
-func buildStreamList(symbols []WatchSymbol) []string {
-	var streams []string
+// buildStreamList constructs a list of stream names for the specified symbols and intervals
+// which are used to subscribe to the Binance WebSocket API
+func buildStreamList(symbols []WatchSymbol, period KLinePeriod) (streamList []string) {
 	for _, symbol := range symbols {
-		stream := fmt.Sprintf("%s@kline_1m", strings.ToLower(symbol.Symbol))
-		streams = append(streams, stream)
+		// Construct the stream name for the symbol and interval, e.g. "btcusdt@kline_1m"
+		stream := fmt.Sprintf("%s@kline_%s", strings.ToLower(symbol.Symbol), period)
+		streamList = append(streamList, stream)
 	}
-	return streams
+	return
 }

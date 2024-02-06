@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="DataSourceManagerImpl" format="xml" multifile-model="true">
-    <data-source source="LOCAL" name="tbots_db@g4" uuid="5d0aa24b-7609-49bd-a7ce-3158ca28555f">
+    <data-source source="LOCAL" name="binance_spot@g4" uuid="a10ce00b-a902-417b-9a5c-089a4053c1ab">
       <driver-ref>postgresql</driver-ref>
       <synchronize>true</synchronize>
+      <remarks>binance_spot</remarks>
       <jdbc-driver>org.postgresql.Driver</jdbc-driver>
-      <jdbc-url>jdbc:postgresql://g4:5434/tbots_db?sslmode=disable</jdbc-url>
+      <jdbc-url>jdbc:postgresql://g4:5432/binance_spot</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
   </component>

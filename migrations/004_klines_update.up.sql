@@ -1,7 +1,6 @@
-
-CREATE OR REPLACE function binance.klines_update(asymbol varchar, aperiod varchar, start_from timestamptz, limit_work_secs int) returns int AS $$
+CREATE OR REPLACE function klines_update(asymbol varchar, aperiod varchar, start_from timestamptz, limit_work_secs int) returns int AS $$
 /*
-The binance.klines_update stored procedure updates the binance.klines table with the
+The klines_update stored procedure updates the klines table with the
 most recent klines for a given symbol and period from the Binance API.
 
 It takes three input parameters:
@@ -10,18 +9,18 @@ aperiod, which represents the period for which the klines are requested,
 start_from, which represents the timestamp from which to start retrieving klines, if there was no history for specified symbol and period .
 limit_work_secs limits time of work for the function. if it can't keep up it will continue next time.
 
-It first retrieves the most recent open time from the binance.klines table,
+It first retrieves the most recent open time from the klines table,
 then uses this value to construct a URL to the Binance API.
-It retrieves the klines from the API and upserts them into the binance.klines table,
+It retrieves the klines from the API and upserts them into the klines table,
 using the ON CONFLICT clause to update any existing rows.
 
 It is safe to call this stored procedure multiple times, even if the current period is not yet closed.
 It will only update the klines up to the most recent data available and exit if there is no new data.
-The stored procedure ensures that duplicate data is not inserted into the binance.klines table..
+The stored procedure ensures that duplicate data is not inserted into the klines table..
 
 The procedure uses a loop to fetch new data in batches, starting from the specified timestamp up to the most recent data.
 It uses the json_array_elements function to extract individual klines from the API response and
-upserts them into the binance.klines table.
+upserts them into the klines table.
 After each batch is inserted, the procedure issues an explicit commit to finalize the transaction and release locks.
 This is necessary because stored procedures in PostgreSQL do not automatically commit transactions.
 
@@ -29,9 +28,9 @@ The procedure raises NOTICE messages to indicate progress and WARNING messages i
 
 To execute the procedure, call it with the appropriate parameters:
 
-CALL binance.klines_update('SOLUSDT', '1h', true, '2023-03-01 00:00:00');
+CALL klines_update('SOLUSDT', '1h', true, '2023-03-01 00:00:00');
 This will fetch the klines for the SOLUSDT trading pair with a 1-hour interval starting from March 1, 2023, and
-update the binance.klines table with new data.
+update the klines table with new data.
 
 */
 DECLARE
@@ -45,7 +44,9 @@ DECLARE
     count_affected int := 0;
     rows_affected int;
     last_clock bigint;
+    api_endpoint text;
 BEGIN
+    api_endpoint := get_api_url('klines');
     current_ts = EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000;
     -- limit time of work to 1limit_work_secs
     last_clock = (EXTRACT(EPOCH FROM clock_timestamp()) + coalesce(limit_work_secs, 50)) * 1000;
@@ -53,7 +54,7 @@ BEGIN
         -- find the most recent time we have,
         -- update the latest entry
         SELECT open_time,close_time INTO last_open, last_close
-        FROM binance.klines
+        FROM klines
         WHERE symbol = asymbol AND period = aperiod
         order by open_time desc;
 
@@ -63,8 +64,8 @@ BEGIN
         last_updated = true;
 
         -- Get the klines from the Binance API
-        url = format('https://api.binance.com/api/v3/klines?symbol=%s&interval=%s&startTime=%s&limit=%s',
-                     asymbol, aperiod, last_open, limit_val);
+        url = format('%s?symbol=%s&interval=%s&startTime=%s&limit=%s',
+                     api_endpoint,asymbol, aperiod, last_open, limit_val);
         RAISE NOTICE 'Fetching klines for % with start_time = %: %', asymbol, to_timestamp(last_open/1000), url;
         -- protect from ERROR:  Resolving timed out after 1000 milliseconds
         begin
@@ -83,7 +84,7 @@ BEGIN
         -- upsert the klines into the klines table
         select t.last_close_time+1, t.rows_affected
         into last_open, rows_affected
-        from binance.upload_klines(asymbol,aperiod,response.content) t;
+        from upload_klines(asymbol,aperiod,response.content) t;
         count_affected = count_affected + rows_affected;
     END LOOP;
 
@@ -93,12 +94,12 @@ END;
 $$ LANGUAGE plpgsql;
 
 select drop_all_sp('binance', 'upload_klines');
-CREATE OR REPLACE FUNCTION binance.upload_klines(
+CREATE OR REPLACE FUNCTION upload_klines(
     asymbol text, aperiod text, klines_jsonb text
 ) RETURNS TABLE (last_close_time bigint, rows_affected integer) AS $$
 BEGIN
     -- obtain an exclusive lock on the key
-    INSERT INTO binance.klines
+    INSERT INTO klines
     (symbol, period, open_time,
      open_price, high_price, low_price, close_price,
      volume, close_time, quote_asset_volume, num_trades,
@@ -129,25 +130,74 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+comment on function upload_klines(text, text, text) is 'Upload klines for a symbol and a period from jsonb to klines table and return last close time and rows affected.';
+
+
+
+-- update_klines_from_ws is provided with a JSON text containing klines data from the Binance WebSocket API.
+-- The function parses the JSON text and inserts the klines data into the klines table.
+-- If a kline with the same symbol, period, and open_time already exists, the function updates the existing kline with the new data.
+-- The function returns the number of rows affected by the insert or update operation.
+
+select drop_all_sp('binance', 'update_klines_from_ws');
+CREATE OR REPLACE FUNCTION update_klines_from_ws(klines_json_text text)
+    RETURNS integer AS $$
+DECLARE
+    klines_json jsonb;
+    d jsonb;
+    k jsonb;
+    rows_affected integer;
+BEGIN
+    klines_json := klines_json_text::jsonb;
+    d := klines_json->>'data';
+    k := d->>'k';
+
+    INSERT INTO klines
+    (symbol, period, open_time,
+     open_price, high_price, low_price, close_price,
+     volume, close_time, quote_asset_volume, num_trades,
+     taker_buy_base_asset_volume, taker_buy_quote_asset_volume)
+    SELECT k->>'s', k->>'i', (k->>'t')::bigint,
+           (k->>'o')::numeric, (k->>'h')::numeric, (k->>'l')::numeric, (k->>'c')::numeric,
+           (k->>'v')::numeric, (k->>'T')::bigint, (k->>'q')::numeric, (k->>'n')::bigint,
+           (k->>'V')::numeric, (k->>'Q')::numeric
+    ON CONFLICT (symbol, period, open_time) DO UPDATE
+        SET
+            open_price = EXCLUDED.open_price,
+            high_price = EXCLUDED.high_price,
+            low_price = EXCLUDED.low_price,
+            close_price = EXCLUDED.close_price,
+            volume = EXCLUDED.volume,
+            close_time = EXCLUDED.close_time,
+            quote_asset_volume = EXCLUDED.quote_asset_volume,
+            num_trades = EXCLUDED.num_trades,
+            taker_buy_base_asset_volume = EXCLUDED.taker_buy_base_asset_volume,
+            taker_buy_quote_asset_volume = EXCLUDED.taker_buy_quote_asset_volume;
+
+    GET DIAGNOSTICS rows_affected = ROW_COUNT;
+
+    RETURN rows_affected;
+END;
+$$ LANGUAGE plpgsql;
 
 /*
-Function Name: binance.klines_update(asymbol, aperiod)
+Function Name: klines_update(asymbol, aperiod)
 Input Parameters:
     - asymbol: The trading symbol for which to update klines.
     - aperiod: The period for which the klines are requested.
 Returns:
     - An integer representing the number of rows affected.
 Description:
-    The `binance.klines_update` function is a simple wrapper around the `binance.klines_update` function with
+    The `klines_update` function is a simple wrapper around the `klines_update()` function with
     `start_from` set to one month ago from the current time.
-    The `binance.klines_update` function updates the `binance.klines` table with the
+    The `klines_update` function updates the `klines` table with the
     most recent klines for a given symbol and period from the Binance API.
     The function returns the number of rows affected.
 Example Usage:
-    SELECT * FROM binance.klines_update('SOLUSDT', '1s');
+    SELECT * FROM klines_update('SOLUSDT', '1s');
 */
 
-CREATE OR REPLACE FUNCTION binance.klines_update(asymbol VARCHAR, aperiod VARCHAR)
+CREATE OR REPLACE FUNCTION klines_update(asymbol VARCHAR, aperiod VARCHAR)
     RETURNS INT AS $$
-    select * from binance.klines_update(asymbol, aperiod, NOW() - INTERVAL '1 month', 3600);
+    select * from klines_update(asymbol, aperiod, NOW() - INTERVAL '1 month', 3600);
 $$ LANGUAGE sql;

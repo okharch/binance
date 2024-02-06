@@ -5,7 +5,7 @@ $$;
 
 --  retrieve the list of all functions and stored procedures in the
 --  binance and trading_indicator schemas, and their parameter names and data types.
-create or replace view binance.sps as
+create or replace view sps as
 SELECT n.nspname AS schema,
        p.proname AS function_name,
        pg_get_function_arguments(p.oid) AS parameters,
@@ -107,3 +107,4 @@ END
 $$ LANGUAGE plpgsql;
 
 
+CREATE EXTENSION IF NOT EXISTS http;

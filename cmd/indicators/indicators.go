@@ -33,7 +33,6 @@ func main() {
 	// get its numeric parameters into slice from $2..$n
 	// os.Args[2..] convert to int and create params slice []int
 	//params := os.Args[3:]
-	...
 	// download all data for SOLUSDT period 1 minute
 	kd, err := klines.FetchKLineDataFromDBSincePeriodsBefore(db, "SOLUSDT", 60*24*365)
 	if err != nil {

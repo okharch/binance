@@ -14,7 +14,11 @@ type WatchSymbol struct {
 	StartOpenTime int64  `db:"start_open_time"`
 }
 
-func fetchWatchedSymbols(db *sqlx.DB) (result []WatchSymbol, err error) {
+type KLinePeriod string
+
+const DayPeriod KLinePeriod = "1d"
+
+func fetchWatchedSymbols(db *sqlx.DB, period KLinePeriod) (result []WatchSymbol, err error) {
 	// fetch the most recent symbols updated first,
 	// so they have a chance to be updated quickly and move on
 	// while others symbols are being updated
@@ -22,18 +26,18 @@ func fetchWatchedSymbols(db *sqlx.DB) (result []WatchSymbol, err error) {
 	SELECT a.symbol, coalesce(bb.open_time, 0) as start_open_time
 	FROM binance.watch_symbols a left join lateral (
 	    select open_time from binance.klines b 
-	    where a.symbol=b.symbol and b.period='1m' 
+	    where a.symbol = b.symbol and b.period = ? 
 	    order by 1 desc limit 1
 	) bb on true
 	order by 2 desc
-	`)
+	`, period)
 	return
 }
 
-func DownloadWatchedSymbols(ctx context.Context, db *sqlx.DB) error {
+func DownloadWatchedSymbols(ctx context.Context, db *sqlx.DB, period KLinePeriod) error {
 
 	// Fetch the list of watched symbols
-	symbols, err := fetchWatchedSymbols(db)
+	symbols, err := fetchWatchedSymbols(db, period)
 	if err != nil {
 		return fmt.Errorf("failed to fetch symbols: %v", err)
 	}
@@ -43,11 +47,11 @@ func DownloadWatchedSymbols(ctx context.Context, db *sqlx.DB) error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		updateFromWebSockets(ctx, db, symbols)
+		updateFromWebSockets(ctx, db, symbols, period)
 	}()
 
 	// Start downloading and updating klines for each symbol concurrently, up to LimitCoroutines at a time
-	downloadSymbolsKlinesViaREST(ctx, db, symbols)
+	downloadSymbolsKlinesViaREST(ctx, db, symbols, period)
 	if ctx.Err() != nil {
 		return nil
 	}
@@ -55,8 +59,8 @@ func DownloadWatchedSymbols(ctx context.Context, db *sqlx.DB) error {
 	return nil
 }
 
-func downloadSymbolsKlinesViaREST(ctx context.Context, db *sqlx.DB, symbols []WatchSymbol) {
-	const LimitCoroutines = 5
+func downloadSymbolsKlinesViaREST(ctx context.Context, db *sqlx.DB, symbols []WatchSymbol, period KLinePeriod) {
+	const LimitCoroutines = 3
 	var wg sync.WaitGroup
 
 	ch := make(chan WatchSymbol)
@@ -65,7 +69,7 @@ func downloadSymbolsKlinesViaREST(ctx context.Context, db *sqlx.DB, symbols []Wa
 		go func() {
 			defer wg.Done()
 			for symbol := range ch {
-				if err := fetchAndUploadKlines(ctx, symbol, "1m", db); err != nil {
+				if err := fetchAndUploadKlines(ctx, symbol, "1d", db); err != nil {
 					log.Printf("failed to fetch and upload klines for symbol %s: %s", symbol.Symbol, err)
 				}
 			}
@@ -85,8 +89,8 @@ func downloadSymbolsKlinesViaREST(ctx context.Context, db *sqlx.DB, symbols []Wa
 	wg.Wait()
 }
 
-func updateFromWebSockets(ctx context.Context, db *sqlx.DB, symbols []WatchSymbol) {
-	updateKlines, err := getBinanceWebSocketKlines(ctx, symbols)
+func updateFromWebSockets(ctx context.Context, db *sqlx.DB, symbols []WatchSymbol, period KLinePeriod) {
+	updateKlines, err := getBinanceWebSocketKlines(ctx, symbols, period)
 	if err != nil {
 		log.Printf("failed to init update klines from web socker: %s", err)
 	}

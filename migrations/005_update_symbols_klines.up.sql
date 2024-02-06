@@ -1,9 +1,9 @@
--- iterate through the rows in the binance.symbol_klines table.
--- For each row, the binance.klines_update stored procedure is called with the corresponding
+-- iterate through the rows in the symbol_klines table.
+-- For each row, the klines_update stored procedure is called with the corresponding
 -- symbol and period values from the current row
-CREATE OR REPLACE PROCEDURE binance.update_symbols_klines() LANGUAGE plpgsql AS $$
+CREATE OR REPLACE PROCEDURE update_symbols_klines() LANGUAGE plpgsql AS $$
 DECLARE
-    -- perl -MDigest::CRC -e'print Digest::CRC::crc64("binance.update_symbols_klines")'
+    -- perl -MDigest::CRC -e'print Digest::CRC::crc64("update_symbols_klines")'
     -- 171798058097168294
     lock_id bigint := 171798058097168294;
     lock_acquired BOOLEAN;
@@ -20,9 +20,9 @@ BEGIN
     perform pg_sleep(1); -- wait for closing of a candlestick
 
     BEGIN
-        -- Iterate through the rows in the binance.symbol_klines table
-        perform binance.klines_update(t.symbol, t.period, now()-p.duration*3000, 40)
-        FROM binance.symbol_klines t, binance.kline_periods p
+        -- Iterate through the rows in the symbol_klines table
+        perform klines_update(t.symbol, t.period, now()-p.duration*3000, 40)
+        FROM symbol_klines t, kline_periods p
         where t.period=p.period;
         -- Release the advisory lock explicitly
         perform pg_advisory_unlock(lock_id);
@@ -37,6 +37,6 @@ $$;
 
 -- try to unlock update_symbols_klines lock, returns true or false and, usually,
 -- WARNING:  you don't own a lock of type ExclusiveLock
-create or replace function binance.unlock_update_symbols_klines() returns bool language sql as $$
+create or replace function unlock_update_symbols_klines() returns bool language sql as $$
 select pg_advisory_unlock(171798058097168294);
 $$;
